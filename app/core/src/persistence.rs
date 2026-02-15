@@ -17,22 +17,17 @@ pub struct HighscoreData {
     pub highscore: u32,
 }
 
-/// Directory where save files are stored
-const SAVE_DIR: &str = "save";
-
-/// Path to the highscore JSON file
-const HIGHSCORE_FILE: &str = "save/highscore.json";
-
-/// Saves the highscore data to a JSON file
+/// Saves the highscore data to a JSON file in the specified directory
 ///
 /// This function will:
-/// 1. Create the `save/` directory if it doesn't exist
+/// 1. Create the save directory if it doesn't exist
 /// 2. Serialize the highscore data to pretty-printed JSON
-/// 3. Write the JSON to `save/highscore.json`
+/// 3. Write the JSON to `{save_dir}/highscore.json`
 ///
 /// # Arguments
 ///
 /// * `data` - The highscore data to save
+/// * `save_dir` - The directory where the highscore file should be saved
 ///
 /// # Returns
 ///
@@ -43,28 +38,37 @@ const HIGHSCORE_FILE: &str = "save/highscore.json";
 ///
 /// ```no_run
 /// # use suika_game_core::persistence::{HighscoreData, save_highscore};
+/// # use std::path::Path;
 /// let data = HighscoreData { highscore: 10000 };
-/// save_highscore(&data).expect("Failed to save highscore");
+/// save_highscore(&data, Path::new("save")).expect("Failed to save highscore");
 /// ```
-pub fn save_highscore(data: &HighscoreData) -> Result<(), Box<dyn std::error::Error>> {
+pub fn save_highscore(
+    data: &HighscoreData,
+    save_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Create save directory if it doesn't exist
-    fs::create_dir_all(SAVE_DIR)?;
+    fs::create_dir_all(save_dir)?;
 
     // Serialize to pretty-printed JSON
     let json = serde_json::to_string_pretty(data)?;
 
     // Write to file
-    fs::write(HIGHSCORE_FILE, json)?;
+    let file_path = save_dir.join("highscore.json");
+    fs::write(file_path, json)?;
 
     Ok(())
 }
 
-/// Loads the highscore data from a JSON file
+/// Loads the highscore data from a JSON file in the specified directory
 ///
 /// This function will:
-/// 1. Check if the highscore file exists
+/// 1. Check if the highscore file exists in the directory
 /// 2. If it exists, read and deserialize the JSON
 /// 3. If it doesn't exist or there's an error, return default (0)
+///
+/// # Arguments
+///
+/// * `save_dir` - The directory where the highscore file is located
 ///
 /// # Returns
 ///
@@ -75,17 +79,20 @@ pub fn save_highscore(data: &HighscoreData) -> Result<(), Box<dyn std::error::Er
 ///
 /// ```no_run
 /// # use suika_game_core::persistence::load_highscore;
-/// let data = load_highscore();
+/// # use std::path::Path;
+/// let data = load_highscore(Path::new("save"));
 /// println!("Current highscore: {}", data.highscore);
 /// ```
-pub fn load_highscore() -> HighscoreData {
+pub fn load_highscore(save_dir: &Path) -> HighscoreData {
+    let file_path = save_dir.join("highscore.json");
+
     // Return default if file doesn't exist
-    if !Path::new(HIGHSCORE_FILE).exists() {
+    if !file_path.exists() {
         return HighscoreData::default();
     }
 
     // Try to read and deserialize the file
-    match fs::read_to_string(HIGHSCORE_FILE) {
+    match fs::read_to_string(&file_path) {
         Ok(json) => {
             // Deserialize JSON, return default if parsing fails
             serde_json::from_str(&json).unwrap_or_default()
@@ -97,7 +104,7 @@ pub fn load_highscore() -> HighscoreData {
 /// Attempts to update the highscore if the new score is higher
 ///
 /// This is a convenience function that:
-/// 1. Loads the current highscore
+/// 1. Loads the current highscore from the specified directory
 /// 2. Compares it with the new score
 /// 3. Saves the new score if it's higher
 /// 4. Returns whether a new highscore was set
@@ -105,6 +112,7 @@ pub fn load_highscore() -> HighscoreData {
 /// # Arguments
 ///
 /// * `new_score` - The score to potentially save as the new highscore
+/// * `save_dir` - The directory where the highscore file is located
 ///
 /// # Returns
 ///
@@ -116,18 +124,22 @@ pub fn load_highscore() -> HighscoreData {
 ///
 /// ```no_run
 /// # use suika_game_core::persistence::update_highscore;
-/// match update_highscore(15000) {
+/// # use std::path::Path;
+/// match update_highscore(15000, Path::new("save")) {
 ///     Ok(true) => println!("New highscore!"),
 ///     Ok(false) => println!("Try again!"),
 ///     Err(e) => eprintln!("Failed to save: {}", e),
 /// }
 /// ```
-pub fn update_highscore(new_score: u32) -> Result<bool, Box<dyn std::error::Error>> {
-    let mut data = load_highscore();
+pub fn update_highscore(
+    new_score: u32,
+    save_dir: &Path,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let mut data = load_highscore(save_dir);
 
     if new_score > data.highscore {
         data.highscore = new_score;
-        save_highscore(&data)?;
+        save_highscore(&data, save_dir)?;
         Ok(true)
     } else {
         Ok(false)
@@ -137,21 +149,7 @@ pub fn update_highscore(new_score: u32) -> Result<bool, Box<dyn std::error::Erro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-
-    // Helper to create a unique test file path for each test
-    fn test_file_path(name: &str) -> String {
-        format!("test_save/{}.json", name)
-    }
-
-    fn test_dir() -> &'static str {
-        "test_save"
-    }
-
-    // Clean up test files after each test
-    fn cleanup_test_files() {
-        let _ = fs::remove_dir_all(test_dir());
-    }
+    use tempfile::TempDir;
 
     #[test]
     fn test_highscore_data_default() {
@@ -174,87 +172,84 @@ mod tests {
 
     #[test]
     fn test_save_and_load_highscore() {
-        cleanup_test_files();
+        let temp_dir = TempDir::new().unwrap();
+        let save_path = temp_dir.path();
 
-        // Create test directory
-        fs::create_dir_all(test_dir()).unwrap();
-
-        let test_file = test_file_path("save_load");
         let data = HighscoreData { highscore: 54321 };
 
-        // Manually save to test file
-        let json = serde_json::to_string_pretty(&data).unwrap();
-        fs::write(&test_file, json).unwrap();
+        // Save using the actual function
+        save_highscore(&data, save_path).unwrap();
 
-        // Manually load from test file
-        let loaded_json = fs::read_to_string(&test_file).unwrap();
-        let loaded: HighscoreData = serde_json::from_str(&loaded_json).unwrap();
+        // Load using the actual function
+        let loaded = load_highscore(save_path);
 
         assert_eq!(loaded.highscore, 54321);
-
-        cleanup_test_files();
     }
 
     #[test]
     fn test_load_nonexistent_file() {
-        cleanup_test_files();
+        let temp_dir = TempDir::new().unwrap();
+        let save_path = temp_dir.path();
 
-        // Load from non-existent file should return default
-        let test_file = test_file_path("nonexistent");
-        if Path::new(&test_file).exists() {
-            fs::remove_file(&test_file).unwrap();
-        }
-
-        // Since we can't override HIGHSCORE_FILE, we test the logic manually
-        let result = if !Path::new(&test_file).exists() {
-            HighscoreData::default()
-        } else {
-            HighscoreData { highscore: 999 }
-        };
+        // Load from directory with no file should return default
+        let result = load_highscore(save_path);
 
         assert_eq!(result.highscore, 0);
-
-        cleanup_test_files();
     }
 
     #[test]
     fn test_load_corrupted_file() {
-        // Create test directory
-        fs::create_dir_all(test_dir()).unwrap();
-
-        let test_file = test_file_path("corrupted");
+        let temp_dir = TempDir::new().unwrap();
+        let save_path = temp_dir.path();
+        let file_path = save_path.join("highscore.json");
 
         // Write invalid JSON
-        fs::write(&test_file, "{ invalid json }").unwrap();
+        fs::write(&file_path, "{ invalid json }").unwrap();
 
-        // Try to load - should return default on parse error
-        let loaded_json = fs::read_to_string(&test_file).unwrap();
-        let result: HighscoreData = serde_json::from_str(&loaded_json).unwrap_or_default();
+        // Load should return default on parse error
+        let result = load_highscore(save_path);
 
         assert_eq!(result.highscore, 0);
-
-        cleanup_test_files();
     }
 
     #[test]
-    fn test_update_highscore_logic() {
-        // Test the logic without actual file operations
-        let current = HighscoreData { highscore: 1000 };
+    fn test_update_highscore_new_high() {
+        let temp_dir = TempDir::new().unwrap();
+        let save_path = temp_dir.path();
 
-        // New score is higher
-        let new_score_high = 2000;
-        let should_update_high = new_score_high > current.highscore;
-        assert!(should_update_high);
+        // Set initial highscore
+        let initial = HighscoreData { highscore: 1000 };
+        save_highscore(&initial, save_path).unwrap();
 
-        // New score is lower
-        let new_score_low = 500;
-        let should_update_low = new_score_low > current.highscore;
-        assert!(!should_update_low);
+        // Update with higher score
+        let updated = update_highscore(2000, save_path).unwrap();
+        assert!(updated);
 
-        // New score is equal
-        let new_score_equal = 1000;
-        let should_update_equal = new_score_equal > current.highscore;
-        assert!(!should_update_equal);
+        // Verify the highscore was saved
+        let loaded = load_highscore(save_path);
+        assert_eq!(loaded.highscore, 2000);
+    }
+
+    #[test]
+    fn test_update_highscore_not_higher() {
+        let temp_dir = TempDir::new().unwrap();
+        let save_path = temp_dir.path();
+
+        // Set initial highscore
+        let initial = HighscoreData { highscore: 1000 };
+        save_highscore(&initial, save_path).unwrap();
+
+        // Update with lower score
+        let updated = update_highscore(500, save_path).unwrap();
+        assert!(!updated);
+
+        // Verify the highscore was not changed
+        let loaded = load_highscore(save_path);
+        assert_eq!(loaded.highscore, 1000);
+
+        // Update with equal score
+        let updated_equal = update_highscore(1000, save_path).unwrap();
+        assert!(!updated_equal);
     }
 
     #[test]
