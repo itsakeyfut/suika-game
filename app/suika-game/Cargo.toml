@@ -1,0 +1,19 @@
+[package]
+name = "suika-game"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "suika-game"
+path = "src/main.rs"
+
+[dependencies]
+bevy.workspace = true
+bevy_rapier2d.workspace = true
+bevy_kira_audio.workspace = true
+
+# 内部クレート
+suika-game-core.workspace = true
+suika-game-ui.workspace = true
+suika-game-audio.workspace = true
+suika-game-assets.workspace = true

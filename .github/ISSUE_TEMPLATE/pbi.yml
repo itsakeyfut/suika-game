@@ -1,0 +1,142 @@
+name: "PBI (Product Backlog Item)"
+description: "Detailed specification for major features"
+title: "[PBI] "
+labels: ["enhancement", "pbi"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Product Backlog Item
+        Use this template for major features that need detailed specifications.
+
+        **When to use:**
+        - Simple feature idea → Use Feature Request template
+        - Complex feature needing specs → Use this PBI template
+
+  - type: textarea
+    id: feature-title
+    attributes:
+      label: Feature Title
+      description: Briefly describe the feature to be implemented
+      placeholder: |
+        Example: Implement combo multiplier system
+        Example: Add pause menu with resume/restart options
+        Example: Implement high score persistence
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: "Describe in the format: 'who', 'what', 'why'"
+      placeholder: |
+        As a [player/developer],
+        I want [what to achieve],
+        So that [value/benefit obtained].
+
+        Example:
+        As a player,
+        I want to see combo multipliers for consecutive merges,
+        So that I feel rewarded for skillful play.
+      value: |
+        As a [player/developer],
+        I want [what to achieve],
+        So that [value/benefit obtained].
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Specific conditions for completion (checklist format)
+      placeholder: |
+        Example (for combo system):
+        - [ ] AC1: Combo counter increments when fruits merge within 2 seconds
+        - [ ] AC2: Combo multiplier applies to score (2x, 3x, 5x, etc.)
+        - [ ] AC3: Combo resets after 2 seconds of no merges
+        - [ ] AC4: Visual feedback shows current combo count
+        - [ ] AC5: Sound effect plays on combo increase
+      value: |
+        - [ ] AC1:
+        - [ ] AC2:
+        - [ ] AC3:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - "P0: Critical (Core mechanic)"
+        - "P1: High (Important feature)"
+        - "P2: Medium (Nice to have)"
+        - "P3: Low (Polish/Extra)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Implementation Phase
+      description: Which phase should this be in? (Ref: docs/06_implementation_plan.md)
+      options:
+        - "Phase 1-3: Core Setup"
+        - "Phase 4-6: Game Logic"
+        - "Phase 7-9: UI & Polish"
+        - "Phase 10: Optimization"
+        - "Phase 11: Asset Integration"
+        - "Future"
+    validations:
+      required: false
+
+  - type: textarea
+    id: technical-design
+    attributes:
+      label: Technical Design (Optional)
+      description: High-level design or implementation notes
+      placeholder: |
+        - Add ComboTimer resource to track time since last merge
+        - Create ComboMultiplier component
+        - Update scoring system to apply multiplier
+        - Add UI element to display combo count
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Other features or tasks this depends on
+      placeholder: |
+        - Requires: #42 (Scoring system implementation)
+        - Blocks: #67 (High score integration)
+    validations:
+      required: false
+
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test Plan (Optional)
+      description: How to verify this feature works correctly
+      placeholder: |
+        1. Spawn two cherries and merge them
+        2. Within 2 seconds, merge two more fruits
+        3. Verify combo counter shows "2x"
+        4. Verify score is doubled
+        5. Wait 3 seconds without merging
+        6. Verify combo resets to 1x
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I've confirmed this hasn't been proposed in existing Issues
+          required: true
+        - label: I've checked the documentation for related designs
+          required: false

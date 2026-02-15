@@ -1,0 +1,39 @@
+[workspace]
+members = [
+    "app/core",
+    "app/ui",
+    "app/audio",
+    "app/assets",
+    "app/suika-game",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
+
+[workspace.dependencies]
+# 外部依存関係（共通バージョン管理）
+bevy = "0.17.3"
+bevy_rapier2d = "0.32.0"
+bevy_kira_audio = "0.24.0"
+rand = "0.10.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# 内部クレート
+suika-game-core = { path = "app/core" }
+suika-game-ui = { path = "app/ui" }
+suika-game-audio = { path = "app/audio" }
+suika-game-assets = { path = "app/assets" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
