@@ -9,11 +9,11 @@ pub mod constants;
 pub mod fruit;
 pub mod persistence;
 pub mod resources;
+pub mod states;
 
 // TODO: 追加モジュール
 // pub mod physics;
 // pub mod components;
-// pub mod states;
 // pub mod systems;
 
 /// ゲームコアプラグイン
