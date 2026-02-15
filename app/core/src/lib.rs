@@ -7,6 +7,7 @@ use bevy::prelude::*;
 // Modules
 pub mod constants;
 pub mod fruit;
+pub mod persistence;
 pub mod resources;
 
 // TODO: 追加モジュール
