@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 use bevy_kira_audio::AudioPlugin;
+use bevy_rapier2d::prelude::*;
 
 use suika_game_assets::GameAssetsPlugin;
 use suika_game_audio::GameAudioPlugin;
