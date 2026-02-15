@@ -7,11 +7,11 @@ use bevy::prelude::*;
 // Modules
 pub mod constants;
 pub mod fruit;
+pub mod resources;
 
 // TODO: 追加モジュール
 // pub mod physics;
 // pub mod components;
-// pub mod resources;
 // pub mod states;
 // pub mod systems;
 
