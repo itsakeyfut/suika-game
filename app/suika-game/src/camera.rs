@@ -11,16 +11,22 @@ use bevy::prelude::*;
 ///
 /// This system creates an orthographic camera with the following properties:
 /// - Orthographic projection (no perspective distortion)
-/// - Positioned above and slightly offset from the game area
-/// - Angled downward to create a 2.5D effect
+/// - Positioned along the Z-axis, looking straight down at the game plane
 /// - Z-axis is used for sprite layering (higher Z = closer to camera)
 ///
 /// # Camera Configuration
 ///
-/// The camera is positioned to provide an oblique overhead view:
+/// The camera is positioned for a top-down orthographic view:
 /// - X: 0.0 (centered horizontally)
 /// - Y: 0.0 (centered vertically)
-/// - Z: 999.9 (far from the game plane)
+/// - Z: 999.9 (far from the game plane, allowing sprites with Z < 999.9 to render)
+///
+/// # 2.5D Effect
+///
+/// The "2.5D" visual effect is achieved through Z-based sprite layering,
+/// not through camera rotation. Sprites can use different Z values to
+/// control rendering order and create depth perception while the physics
+/// simulation remains strictly 2D on the X-Y plane.
 ///
 /// The projection is orthographic with a scale that fits the game container.
 pub fn setup_camera(mut commands: Commands) {
