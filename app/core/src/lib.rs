@@ -4,8 +4,10 @@
 
 use bevy::prelude::*;
 
-// TODO: モジュールの追加
-// pub mod fruit;
+// Modules
+pub mod fruit;
+
+// TODO: 追加モジュール
 // pub mod physics;
 // pub mod components;
 // pub mod resources;
