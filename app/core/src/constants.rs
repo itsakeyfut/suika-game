@@ -96,6 +96,15 @@ pub mod game_over {
     pub const TIMER: f32 = 3.0;
 }
 
+/// Persistence and storage constants
+pub mod storage {
+    /// Directory where save files are stored
+    ///
+    /// This directory will be created if it doesn't exist when
+    /// saving game data (e.g., highscore).
+    pub const SAVE_DIR: &str = "save";
+}
+
 /// Fruit parameters and calculations
 pub mod fruit {
     /// Fruit radii in pixels for all 11 fruit types
@@ -240,6 +249,7 @@ mod tests {
         assert_eq!(combo::COMBO_WINDOW, 2.0);
         assert_eq!(combo::COMBO_MAX, 10);
         assert_eq!(game_over::TIMER, 3.0);
+        assert_eq!(storage::SAVE_DIR, "save");
     }
 
     #[test]

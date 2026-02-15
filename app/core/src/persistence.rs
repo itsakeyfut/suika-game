@@ -38,9 +38,10 @@ pub struct HighscoreData {
 ///
 /// ```no_run
 /// # use suika_game_core::persistence::{HighscoreData, save_highscore};
+/// # use suika_game_core::constants::storage::SAVE_DIR;
 /// # use std::path::Path;
 /// let data = HighscoreData { highscore: 10000 };
-/// save_highscore(&data, Path::new("save")).expect("Failed to save highscore");
+/// save_highscore(&data, Path::new(SAVE_DIR)).expect("Failed to save highscore");
 /// ```
 pub fn save_highscore(
     data: &HighscoreData,
@@ -79,8 +80,9 @@ pub fn save_highscore(
 ///
 /// ```no_run
 /// # use suika_game_core::persistence::load_highscore;
+/// # use suika_game_core::constants::storage::SAVE_DIR;
 /// # use std::path::Path;
-/// let data = load_highscore(Path::new("save"));
+/// let data = load_highscore(Path::new(SAVE_DIR));
 /// println!("Current highscore: {}", data.highscore);
 /// ```
 pub fn load_highscore(save_dir: &Path) -> HighscoreData {
@@ -124,8 +126,9 @@ pub fn load_highscore(save_dir: &Path) -> HighscoreData {
 ///
 /// ```no_run
 /// # use suika_game_core::persistence::update_highscore;
+/// # use suika_game_core::constants::storage::SAVE_DIR;
 /// # use std::path::Path;
-/// match update_highscore(15000, Path::new("save")) {
+/// match update_highscore(15000, Path::new(SAVE_DIR)) {
 ///     Ok(true) => println!("New highscore!"),
 ///     Ok(false) => println!("Try again!"),
 ///     Err(e) => eprintln!("Failed to save: {}", e),
