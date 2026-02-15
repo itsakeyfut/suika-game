@@ -1,4 +1,5 @@
 mod camera;
+mod container;
 
 use bevy::prelude::*;
 use bevy_kira_audio::AudioPlugin;
@@ -41,7 +42,14 @@ fn main() {
         .add_plugins(GameUIPlugin)
         .add_plugins(GameAudioPlugin)
         // Startup systems
-        .add_systems(Startup, (setup_camera, load_highscore_system))
+        .add_systems(
+            Startup,
+            (
+                setup_camera,
+                container::setup_container,
+                load_highscore_system,
+            ),
+        )
         .run();
 }
 
