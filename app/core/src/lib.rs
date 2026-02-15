@@ -5,6 +5,7 @@
 use bevy::prelude::*;
 
 // Modules
+pub mod components;
 pub mod constants;
 pub mod fruit;
 pub mod persistence;
@@ -13,7 +14,6 @@ pub mod states;
 
 // TODO: 追加モジュール
 // pub mod physics;
-// pub mod components;
 // pub mod systems;
 
 /// ゲームコアプラグイン
