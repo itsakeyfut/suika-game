@@ -4,12 +4,12 @@ use bevy_rapier2d::prelude::*;
 
 use suika_game_assets::GameAssetsPlugin;
 use suika_game_audio::GameAudioPlugin;
-use suika_game_core::GameCorePlugin;
+use suika_game_core::prelude::*;
 use suika_game_ui::GameUIPlugin;
 
 fn main() {
     App::new()
-        // Bevyデフォルトプラグイン
+        // Bevy default plugins
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "スイカゲーム".to_string(),
@@ -18,14 +18,35 @@ fn main() {
             }),
             ..default()
         }))
-        // 外部プラグイン
+        // External plugins
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugins(RapierDebugRenderPlugin::default()) // デバッグ用
+        .add_plugins(RapierDebugRenderPlugin::default()) // Debug rendering
         .add_plugins(AudioPlugin)
-        // ゲームプラグイン（内部クレート）
-        .add_plugins(GameAssetsPlugin) // 最初にアセットをロード
+        // Application state
+        .init_state::<AppState>()
+        // Game resources
+        .init_resource::<GameState>()
+        .init_resource::<ComboTimer>()
+        .init_resource::<GameOverTimer>()
+        .init_resource::<NextFruitType>()
+        // Game plugins (internal crates)
+        .add_plugins(GameAssetsPlugin) // Load assets first
         .add_plugins(GameCorePlugin)
         .add_plugins(GameUIPlugin)
         .add_plugins(GameAudioPlugin)
+        // Startup systems
+        .add_systems(Startup, load_highscore_system)
         .run();
+}
+
+/// Loads the highscore from disk at startup
+///
+/// This system runs once during app initialization and loads the
+/// saved highscore into the GameState resource.
+fn load_highscore_system(mut game_state: ResMut<GameState>) {
+    let highscore_data = load_highscore(std::path::Path::new(constants::storage::SAVE_DIR));
+
+    game_state.highscore = highscore_data.highscore;
+
+    info!("Highscore loaded from disk: {}", highscore_data.highscore);
 }
