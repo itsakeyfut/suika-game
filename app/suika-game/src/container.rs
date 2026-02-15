@@ -85,7 +85,21 @@ pub fn setup_container(mut commands: Commands) {
         },
     ));
 
-    info!("Game container initialized with 3 walls");
+    // Boundary line (game over line) - visual only, no physics
+    let boundary_y = constants::physics::BOUNDARY_LINE_Y;
+    let line_thickness = 3.0;
+
+    commands.spawn((
+        BoundaryLine,
+        Transform::from_xyz(0.0, boundary_y, 0.0),
+        Sprite {
+            color: Color::srgba(1.0, 0.0, 0.0, 0.5), // Red semi-transparent
+            custom_size: Some(Vec2::new(container_width, line_thickness)),
+            ..default()
+        },
+    ));
+
+    info!("Game container initialized with 3 walls and boundary line");
 }
 
 #[cfg(test)]
@@ -168,5 +182,80 @@ mod tests {
         let mut query = app.world_mut().query::<(&Container, &Sprite)>();
         let sprite_count = query.iter(app.world()).count();
         assert_eq!(sprite_count, 3, "All walls should have sprites");
+    }
+
+    #[test]
+    fn test_boundary_line_exists() {
+        let mut app = App::new();
+        app.add_systems(Startup, setup_container);
+        app.update();
+
+        // Verify exactly one boundary line exists
+        let mut query = app.world_mut().query::<&BoundaryLine>();
+        let boundary_count = query.iter(app.world()).count();
+        assert_eq!(boundary_count, 1, "Should have exactly one boundary line");
+    }
+
+    #[test]
+    fn test_boundary_line_position() {
+        let mut app = App::new();
+        app.add_systems(Startup, setup_container);
+        app.update();
+
+        // Verify boundary line Y position
+        let mut query = app.world_mut().query::<(&BoundaryLine, &Transform)>();
+        for (_, transform) in query.iter(app.world()) {
+            assert_eq!(
+                transform.translation.y,
+                constants::physics::BOUNDARY_LINE_Y,
+                "Boundary line should be at BOUNDARY_LINE_Y"
+            );
+        }
+    }
+
+    #[test]
+    fn test_boundary_line_no_physics() {
+        let mut app = App::new();
+        app.add_systems(Startup, setup_container);
+        app.update();
+
+        // Verify boundary line has no RigidBody
+        let mut query = app.world_mut().query::<(&BoundaryLine, &RigidBody)>();
+        let rigid_body_count = query.iter(app.world()).count();
+        assert_eq!(
+            rigid_body_count, 0,
+            "Boundary line should not have a RigidBody (visual only)"
+        );
+
+        // Verify boundary line has no Collider
+        let mut query = app.world_mut().query::<(&BoundaryLine, &Collider)>();
+        let collider_count = query.iter(app.world()).count();
+        assert_eq!(
+            collider_count, 0,
+            "Boundary line should not have a Collider (visual only)"
+        );
+    }
+
+    #[test]
+    fn test_boundary_line_sprite() {
+        let mut app = App::new();
+        app.add_systems(Startup, setup_container);
+        app.update();
+
+        // Verify boundary line has a sprite
+        let mut query = app.world_mut().query::<(&BoundaryLine, &Sprite)>();
+        let sprite_count = query.iter(app.world()).count();
+        assert_eq!(sprite_count, 1, "Boundary line should have a sprite");
+
+        // Verify the sprite color is red with transparency
+        let mut query = app.world_mut().query::<(&BoundaryLine, &Sprite)>();
+        for (_, sprite) in query.iter(app.world()) {
+            let color = sprite.color.to_srgba();
+            assert_eq!(color.red, 1.0, "Boundary line should be red");
+            assert!(
+                color.alpha < 1.0,
+                "Boundary line should be semi-transparent"
+            );
+        }
     }
 }
