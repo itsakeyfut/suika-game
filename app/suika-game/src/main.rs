@@ -6,6 +6,7 @@ use bevy_kira_audio::AudioPlugin;
 use bevy_rapier2d::prelude::*;
 
 use camera::setup_camera;
+use container::setup_container;
 use suika_game_assets::GameAssetsPlugin;
 use suika_game_audio::GameAudioPlugin;
 use suika_game_core::prelude::*;
@@ -44,11 +45,7 @@ fn main() {
         // Startup systems
         .add_systems(
             Startup,
-            (
-                setup_camera,
-                container::setup_container,
-                load_highscore_system,
-            ),
+            (setup_camera, setup_container, load_highscore_system),
         )
         .run();
 }
