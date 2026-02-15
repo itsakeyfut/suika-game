@@ -19,6 +19,9 @@ fn main() {
             ..default()
         }))
         // External plugins
+        // Rapier physics with 100 pixels per meter scaling
+        // Default gravity is -9.81 m/s², which equals -981 pixels/s²
+        // This is approximately our target of -980 pixels/s² from constants::physics::GRAVITY
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default()) // Debug rendering
         .add_plugins(AudioPlugin)
