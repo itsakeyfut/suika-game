@@ -7,14 +7,20 @@ edition.workspace = true
 name = "suika-game"
 path = "src/main.rs"
 
+[features]
+default = ["dev-tools"]
+dev-tools = ["bevy-inspector-egui"]
+
 [dependencies]
 bevy.workspace = true
 bevy_rapier2d.workspace = true
 bevy_kira_audio.workspace = true
-bevy-inspector-egui.workspace = true
+bevy-inspector-egui = { workspace = true, optional = true }
 
 # 内部クレート
 suika-game-core.workspace = true
 suika-game-ui.workspace = true
 suika-game-audio.workspace = true
 suika-game-assets.workspace = true
+
+[dev-dependencies]
