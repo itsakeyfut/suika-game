@@ -6,7 +6,7 @@
 use bevy::prelude::*;
 
 use crate::components::{Fruit, FruitSpawnState, NextFruitPreview};
-use crate::constants::physics;
+use crate::config::{FruitsConfig, FruitsConfigHandle, GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle};
 use crate::resources::NextFruitType;
 
 /// Sets up the next fruit preview display
@@ -26,19 +26,49 @@ use crate::resources::NextFruitType;
 /// # Note
 ///
 /// This system should run during Startup to create the initial preview entity.
-pub fn setup_fruit_preview(mut commands: Commands, next_fruit: Res<NextFruitType>) {
-    let params = next_fruit.get().parameters();
+pub fn setup_fruit_preview(
+    mut commands: Commands,
+    next_fruit: Res<NextFruitType>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    physics_config_handle: Res<PhysicsConfigHandle>,
+    physics_config_assets: Res<Assets<PhysicsConfig>>,
+    game_rules_handle: Res<GameRulesConfigHandle>,
+    game_rules_assets: Res<Assets<GameRulesConfig>>,
+) {
+    // Get the configs
+    let radius = if let Some(config) = fruits_config_assets.get(&fruits_config_handle.0) {
+        next_fruit.get().parameters_from_config(config).radius
+    } else {
+        warn!("Fruits config not loaded yet, using default radius for preview");
+        20.0 // Default to smallest fruit
+    };
 
-    // Preview position: fixed position on the right side of the screen
-    // Positioned to the right of the container with some margin
-    let preview_x = physics::CONTAINER_WIDTH / 2.0 + 120.0;
-    let preview_y = physics::CONTAINER_HEIGHT / 2.0 - 100.0; // Upper area
+    // Get preview position and scale from game rules config
+    let (preview_x_offset, preview_y_offset, preview_scale) =
+        if let Some(rules) = game_rules_assets.get(&game_rules_handle.0) {
+            (rules.preview_x_offset, rules.preview_y_offset, rules.preview_scale)
+        } else {
+            (120.0, -100.0, 1.5) // Fallback defaults
+        };
+
+    // Get container dimensions from physics config
+    let (container_width, container_height) =
+        if let Some(physics) = physics_config_assets.get(&physics_config_handle.0) {
+            (physics.container_width, physics.container_height)
+        } else {
+            (600.0, 800.0) // Fallback defaults
+        };
+
+    // Preview position: positioned relative to container
+    let preview_x = container_width / 2.0 + preview_x_offset;
+    let preview_y = container_height / 2.0 + preview_y_offset;
 
     commands.spawn((
         NextFruitPreview,
         Sprite {
             color: next_fruit.get().placeholder_color(),
-            custom_size: Some(Vec2::splat(params.radius * 1.5)),
+            custom_size: Some(Vec2::splat(radius * preview_scale)),
             ..default()
         },
         Transform::from_xyz(preview_x, preview_y, 10.0),
@@ -75,7 +105,14 @@ pub fn update_fruit_preview(
     mut preview_query: Query<(&mut Sprite, &mut Visibility), With<NextFruitPreview>>,
     next_fruit: Res<NextFruitType>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    game_rules_handle: Res<GameRulesConfigHandle>,
+    game_rules_assets: Res<Assets<GameRulesConfig>>,
 ) {
+    // Get the configs
+    let fruits_config = fruits_config_assets.get(&fruits_config_handle.0);
+    let game_rules = game_rules_assets.get(&game_rules_handle.0);
     // Check if there's a held or falling fruit
     let has_held_fruit = fruit_states
         .iter()
@@ -101,9 +138,12 @@ pub fn update_fruit_preview(
 
         // Update preview when next fruit type changes
         if next_fruit.is_changed() {
-            let params = next_fruit.get().parameters();
             sprite.color = next_fruit.get().placeholder_color();
-            sprite.custom_size = Some(Vec2::splat(params.radius * 1.5));
+            if let Some(fruits_cfg) = fruits_config {
+                let preview_scale = game_rules.map(|r| r.preview_scale).unwrap_or(1.5);
+                let params = next_fruit.get().parameters_from_config(fruits_cfg);
+                sprite.custom_size = Some(Vec2::splat(params.radius * preview_scale));
+            }
         }
     }
 }

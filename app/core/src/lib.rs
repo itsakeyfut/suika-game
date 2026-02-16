@@ -39,6 +39,7 @@ use bevy::prelude::*;
 
 // Module declarations
 pub mod components;
+pub mod config;
 pub mod constants;
 pub mod fruit;
 pub mod persistence;
@@ -77,6 +78,14 @@ pub mod prelude {
 
     // Systems
     pub use crate::systems;
+
+    // Config
+    pub use crate::config::{
+        FruitConfigEntry, FruitsConfig, FruitsConfigHandle,
+        GameRulesConfig, GameRulesConfigHandle,
+        PhysicsConfig, PhysicsConfigHandle,
+        GameConfigPlugin,
+    };
 
     // Plugin
     pub use crate::GameCorePlugin;

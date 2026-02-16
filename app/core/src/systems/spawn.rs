@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
 use crate::components::Fruit;
+use crate::config::FruitsConfig;
 use crate::fruit::FruitType;
 
 /// Spawns a fruit entity at the specified position
@@ -23,6 +24,7 @@ use crate::fruit::FruitType;
 /// * `commands` - Mutable reference to Bevy Commands for entity spawning
 /// * `fruit_type` - The type of fruit to spawn (determines size, color, physics)
 /// * `position` - 2D position (x, y) where the fruit should be spawned
+/// * `config` - Reference to the fruits configuration (for parameters)
 ///
 /// # Returns
 ///
@@ -35,17 +37,24 @@ use crate::fruit::FruitType;
 /// # use bevy::math::Vec2;
 /// # use suika_game_core::systems::spawn::spawn_fruit;
 /// # use suika_game_core::fruit::FruitType;
-/// fn spawn_system(mut commands: Commands) {
+/// # use suika_game_core::config::FruitsConfig;
+/// fn spawn_system(mut commands: Commands, config: Res<FruitsConfig>) {
 ///     let fruit_entity = spawn_fruit(
 ///         &mut commands,
 ///         FruitType::Cherry,
 ///         Vec2::new(0.0, 300.0),
+///         &config,
 ///     );
 ///     info!("Spawned fruit with ID: {:?}", fruit_entity);
 /// }
 /// ```
-pub fn spawn_fruit(commands: &mut Commands, fruit_type: FruitType, position: Vec2) -> Entity {
-    let params = fruit_type.parameters();
+pub fn spawn_fruit(
+    commands: &mut Commands,
+    fruit_type: FruitType,
+    position: Vec2,
+    config: &FruitsConfig,
+) -> Entity {
+    let params = fruit_type.parameters_from_config(config);
 
     commands
         .spawn((
@@ -83,14 +92,112 @@ pub fn spawn_fruit(commands: &mut Commands, fruit_type: FruitType, position: Vec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::FruitConfigEntry;
+
+    // Helper function to create a test config
+    fn create_test_config() -> FruitsConfig {
+        FruitsConfig {
+            fruits: vec![
+                FruitConfigEntry {
+                    name: "Cherry".to_string(),
+                    radius: 20.0,
+                    points: 10,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Strawberry".to_string(),
+                    radius: 30.0,
+                    points: 20,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Grape".to_string(),
+                    radius: 40.0,
+                    points: 40,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Dekopon".to_string(),
+                    radius: 50.0,
+                    points: 80,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Persimmon".to_string(),
+                    radius: 60.0,
+                    points: 160,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Apple".to_string(),
+                    radius: 70.0,
+                    points: 320,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Pear".to_string(),
+                    radius: 80.0,
+                    points: 640,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Peach".to_string(),
+                    radius: 90.0,
+                    points: 1280,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Pineapple".to_string(),
+                    radius: 100.0,
+                    points: 2560,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Melon".to_string(),
+                    radius: 110.0,
+                    points: 5120,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Watermelon".to_string(),
+                    radius: 120.0,
+                    points: 10240,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+            ],
+        }
+    }
 
     #[test]
     fn test_spawn_fruit_creates_entity() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Cherry, Vec2::new(0.0, 100.0));
+        let entity = spawn_fruit(&mut commands, FruitType::Cherry, Vec2::new(0.0, 100.0), &config);
 
         // Flush commands to apply them
         app.update();
@@ -106,9 +213,10 @@ mod tests {
     fn test_spawn_fruit_has_fruit_component() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Strawberry, Vec2::new(10.0, 20.0));
+        let entity = spawn_fruit(&mut commands, FruitType::Strawberry, Vec2::new(10.0, 20.0), &config);
 
         app.update();
 
@@ -123,10 +231,11 @@ mod tests {
     fn test_spawn_fruit_has_transform() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
         let position = Vec2::new(50.0, 150.0);
-        let entity = spawn_fruit(&mut commands, FruitType::Grape, position);
+        let entity = spawn_fruit(&mut commands, FruitType::Grape, position, &config);
 
         app.update();
 
@@ -141,10 +250,11 @@ mod tests {
     fn test_spawn_fruit_has_sprite() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
         let fruit_type = FruitType::Apple;
-        let entity = spawn_fruit(&mut commands, fruit_type, Vec2::new(0.0, 0.0));
+        let entity = spawn_fruit(&mut commands, fruit_type, Vec2::new(0.0, 0.0), &config);
 
         app.update();
 
@@ -157,7 +267,7 @@ mod tests {
 
         // Verify sprite has correct size (diameter = radius * 2)
         let sprite = sprite.unwrap();
-        let params = fruit_type.parameters();
+        let params = fruit_type.parameters_from_config(&config);
         let expected_size = Vec2::splat(params.radius * 2.0);
         assert_eq!(sprite.custom_size, Some(expected_size));
     }
@@ -166,9 +276,10 @@ mod tests {
     fn test_spawn_fruit_has_physics_components() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Peach, Vec2::new(0.0, 0.0));
+        let entity = spawn_fruit(&mut commands, FruitType::Peach, Vec2::new(0.0, 0.0), &config);
 
         app.update();
 
@@ -203,9 +314,10 @@ mod tests {
     fn test_spawn_fruit_rigid_body_is_dynamic() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Pineapple, Vec2::new(0.0, 0.0));
+        let entity = spawn_fruit(&mut commands, FruitType::Pineapple, Vec2::new(0.0, 0.0), &config);
 
         app.update();
 
@@ -218,6 +330,7 @@ mod tests {
     fn test_spawn_different_fruit_types() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        let config = create_test_config();
 
         // Test spawning all fruit types
         let fruit_types = [
@@ -236,7 +349,7 @@ mod tests {
 
         for fruit_type in fruit_types {
             let mut commands = app.world_mut().commands();
-            let entity = spawn_fruit(&mut commands, fruit_type, Vec2::new(0.0, 0.0));
+            let entity = spawn_fruit(&mut commands, fruit_type, Vec2::new(0.0, 0.0), &config);
             app.update();
 
             assert!(

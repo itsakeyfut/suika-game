@@ -14,7 +14,7 @@ use bevy_rapier2d::prelude::*;
 use bevy_rapier2d::rapier::geometry::CollisionEventFlags;
 
 use crate::components::{BottomWall, Fruit, FruitSpawnState};
-use crate::constants::physics;
+use crate::config::{FruitsConfig, FruitsConfigHandle, PhysicsConfig, PhysicsConfigHandle};
 use crate::fruit::FruitType;
 use crate::resources::NextFruitType;
 
@@ -79,7 +79,21 @@ pub fn spawn_held_fruit(
     mut next_fruit: ResMut<NextFruitType>,
     spawn_pos: Res<SpawnPosition>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    physics_config_handle: Res<PhysicsConfigHandle>,
+    physics_config_assets: Res<Assets<PhysicsConfig>>,
 ) {
+    // Get the configs, return early if not loaded yet
+    let Some(fruits_config) = fruits_config_assets.get(&fruits_config_handle.0) else {
+        warn!("Fruits config not loaded yet, cannot spawn fruit");
+        return;
+    };
+    let Some(physics_config) = physics_config_assets.get(&physics_config_handle.0) else {
+        warn!("Physics config not loaded yet, cannot spawn fruit");
+        return;
+    };
+
     // Count fruits by state in a single iteration
     let (held_count, falling_count, landed_count) =
         fruit_states
@@ -101,8 +115,8 @@ pub fn spawn_held_fruit(
     // 1. No fruit in Held state
     // 2. No fruit in Falling state (wait for it to land first)
     if held_count == 0 && falling_count == 0 {
-        let spawn_y = physics::CONTAINER_HEIGHT / 2.0 - 50.0;
-        let params = next_fruit.get().parameters();
+        let spawn_y = physics_config.container_height / 2.0 - physics_config.fruit_spawn_y_offset;
+        let params = next_fruit.get().parameters_from_config(fruits_config);
 
         commands.spawn((
             // Fruit marker and type
@@ -214,14 +228,26 @@ pub fn handle_fruit_drop_input(
     mouse_button: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut held_fruits: Query<(Entity, &FruitType, &mut FruitSpawnState), With<Fruit>>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    physics_config_handle: Res<PhysicsConfigHandle>,
+    physics_config_assets: Res<Assets<PhysicsConfig>>,
 ) {
+    // Get the configs, return early if not loaded yet
+    let Some(fruits_config) = fruits_config_assets.get(&fruits_config_handle.0) else {
+        return;
+    };
+    let Some(physics_config) = physics_config_assets.get(&physics_config_handle.0) else {
+        return;
+    };
+
     if mouse_button.just_pressed(MouseButton::Left) || keyboard.just_pressed(KeyCode::Space) {
         for (entity, fruit_type, mut spawn_state) in held_fruits.iter_mut() {
             if *spawn_state == FruitSpawnState::Held {
                 // Transition to Falling state
                 *spawn_state = FruitSpawnState::Falling;
 
-                let params = fruit_type.parameters();
+                let params = fruit_type.parameters_from_config(fruits_config);
 
                 // Convert to dynamic rigid body with physics properties
                 // Reset velocity to prevent diagonal falling due to kinematic movement
@@ -235,8 +261,8 @@ pub fn handle_fruit_drop_input(
                     Friction::coefficient(params.friction),
                     ColliderMassProperties::Mass(params.mass),
                     Damping {
-                        linear_damping: 0.5,
-                        angular_damping: 0.1,
+                        linear_damping: physics_config.fruit_linear_damping,
+                        angular_damping: physics_config.fruit_angular_damping,
                     },
                     GravityScale(1.0),
                 ));
@@ -279,7 +305,14 @@ pub fn update_spawn_position(
     mut last_cursor_pos: ResMut<LastCursorPosition>,
     mut held_fruits: Query<(&mut Transform, &FruitSpawnState, &FruitType), With<Fruit>>,
     time: Res<Time>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    physics_config_handle: Res<PhysicsConfigHandle>,
+    physics_config_assets: Res<Assets<PhysicsConfig>>,
 ) {
+    // Get the configs
+    let fruits_config = fruits_config_assets.get(&fruits_config_handle.0);
+    let physics_config = physics_config_assets.get(&physics_config_handle.0);
     // Check for keyboard input and switch mode if detected
     let keyboard_input = keyboard.pressed(KeyCode::ArrowLeft)
         || keyboard.pressed(KeyCode::KeyA)
@@ -292,12 +325,15 @@ pub fn update_spawn_position(
 
     // Handle keyboard movement (only in keyboard mode)
     if *input_mode == InputMode::Keyboard {
-        const MOVE_SPEED: f32 = 300.0; // pixels per second
+        let move_speed = physics_config
+            .map(|c| c.keyboard_move_speed)
+            .unwrap_or(300.0); // Fallback to 300.0 if config not loaded
+
         if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
-            spawn_pos.x -= MOVE_SPEED * time.delta_secs();
+            spawn_pos.x -= move_speed * time.delta_secs();
         }
         if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) {
-            spawn_pos.x += MOVE_SPEED * time.delta_secs();
+            spawn_pos.x += move_speed * time.delta_secs();
         }
     }
 
@@ -331,15 +367,22 @@ pub fn update_spawn_position(
     }
 
     // Get the held fruit's radius for proper clamping
-    let held_fruit_radius = held_fruits
-        .iter()
-        .find(|(_, state, _)| **state == FruitSpawnState::Held)
-        .map(|(_, _, fruit_type)| fruit_type.parameters().radius)
-        .unwrap_or(20.0); // Default to smallest fruit if none found
+    let held_fruit_radius = if let Some(config) = fruits_config {
+        held_fruits
+            .iter()
+            .find(|(_, state, _)| **state == FruitSpawnState::Held)
+            .map(|(_, _, fruit_type)| fruit_type.parameters_from_config(config).radius)
+            .unwrap_or(20.0) // Default to smallest fruit if none found
+    } else {
+        20.0 // Config not loaded yet, use default
+    };
 
     // Clamp spawn position within container bounds
     // Use the actual fruit radius to allow the fruit to touch the wall
-    let max_x = physics::CONTAINER_WIDTH / 2.0 - held_fruit_radius;
+    let container_width = physics_config
+        .map(|c| c.container_width)
+        .unwrap_or(600.0); // Fallback
+    let max_x = container_width / 2.0 - held_fruit_radius;
     spawn_pos.x = spawn_pos.x.clamp(-max_x, max_x);
 
     // Update ONLY held fruit position to match spawn position

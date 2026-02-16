@@ -47,6 +47,7 @@ fn main() {
         .init_resource::<LastCursorPosition>()
         // Game plugins (internal crates)
         .add_plugins(GameAssetsPlugin) // Load assets first
+        .add_plugins(GameConfigPlugin) // Load game configuration
         .add_plugins(GameCorePlugin)
         .add_plugins(GameUIPlugin)
         .add_plugins(GameAudioPlugin)

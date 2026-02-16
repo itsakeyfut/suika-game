@@ -24,14 +24,28 @@ use suika_game_core::prelude::*;
 ///
 /// # Container Dimensions
 ///
-/// Based on `constants::physics`:
-/// - Width: 600 pixels
-/// - Height: 800 pixels
-/// - Wall thickness: 20 pixels
-pub fn setup_container(mut commands: Commands) {
-    let container_width = constants::physics::CONTAINER_WIDTH;
-    let container_height = constants::physics::CONTAINER_HEIGHT;
-    let wall_thickness = constants::physics::WALL_THICKNESS;
+/// Loaded from `PhysicsConfig`:
+/// - Width, height, wall thickness from physics.ron
+/// - Wall restitution and friction from config
+pub fn setup_container(
+    mut commands: Commands,
+    physics_handle: Res<PhysicsConfigHandle>,
+    physics_assets: Res<Assets<PhysicsConfig>>,
+) {
+    // Get physics config, fallback to defaults if not loaded yet
+    let (container_width, container_height, wall_thickness, wall_restitution, wall_friction) =
+        if let Some(config) = physics_assets.get(&physics_handle.0) {
+            (
+                config.container_width,
+                config.container_height,
+                config.wall_thickness,
+                config.wall_restitution,
+                config.wall_friction,
+            )
+        } else {
+            warn!("Physics config not loaded yet, using fallback values");
+            (600.0, 800.0, 20.0, 0.2, 0.5)
+        };
 
     // Calculate wall positions
     let half_width = container_width / 2.0;
@@ -42,9 +56,9 @@ pub fn setup_container(mut commands: Commands) {
         Container,
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
-        Friction::coefficient(0.5),
+        Friction::coefficient(wall_friction),
         Restitution {
-            coefficient: 0.3,
+            coefficient: wall_restitution,
             combine_rule: CoefficientCombineRule::Min,
         },
         ActiveEvents::COLLISION_EVENTS,
@@ -61,9 +75,9 @@ pub fn setup_container(mut commands: Commands) {
         Container,
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
-        Friction::coefficient(0.5),
+        Friction::coefficient(wall_friction),
         Restitution {
-            coefficient: 0.3,
+            coefficient: wall_restitution,
             combine_rule: CoefficientCombineRule::Min,
         },
         ActiveEvents::COLLISION_EVENTS,
@@ -81,7 +95,7 @@ pub fn setup_container(mut commands: Commands) {
         BottomWall, // Marker for landing detection
         RigidBody::Fixed,
         Collider::cuboid(half_width + wall_thickness, wall_thickness / 2.0),
-        Friction::coefficient(0.5),
+        Friction::coefficient(wall_friction),
         Restitution {
             coefficient: 0.0, // No bounce on ground
             combine_rule: CoefficientCombineRule::Min,
@@ -99,7 +113,11 @@ pub fn setup_container(mut commands: Commands) {
     ));
 
     // Boundary line (game over line) - visual only, no physics
-    let boundary_y = constants::physics::BOUNDARY_LINE_Y;
+    let boundary_y = if let Some(config) = physics_assets.get(&physics_handle.0) {
+        config.boundary_line_y
+    } else {
+        300.0 // Fallback
+    };
     let line_thickness = 3.0;
 
     commands.spawn((

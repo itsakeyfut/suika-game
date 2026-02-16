@@ -4,6 +4,7 @@
 //! from Cherry (smallest) to Watermelon (largest).
 
 use bevy::prelude::*;
+use crate::config::FruitsConfig;
 
 /// Represents the 11 fruit types in the evolution chain
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component)]
@@ -73,7 +74,34 @@ impl FruitType {
         }
     }
 
-    /// Returns the physical and game parameters for this fruit type
+    /// Returns the physical and game parameters for this fruit type from RON config
+    ///
+    /// This method reads parameters from the externalized RON configuration,
+    /// allowing hot-reload of fruit parameters during gameplay.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fruit config doesn't contain data for this fruit type.
+    pub fn parameters_from_config(&self, config: &FruitsConfig) -> FruitParams {
+        let index = *self as usize;
+        let entry = &config.fruits[index];
+
+        // Calculate mass from radius and mass_multiplier
+        let mass = entry.radius * entry.radius * entry.mass_multiplier;
+
+        FruitParams {
+            radius: entry.radius,
+            mass,
+            restitution: entry.restitution,
+            friction: entry.friction,
+            points: entry.points,
+        }
+    }
+
+    /// Returns the physical and game parameters for this fruit type (legacy hardcoded values)
+    ///
+    /// **Note**: This method uses hardcoded values and is kept for backward compatibility
+    /// with tests. New code should use `parameters_from_config()` instead.
     ///
     /// Parameters are based on the fruit size progression:
     /// - Radius: 20px to 120px (increments of 10px)
