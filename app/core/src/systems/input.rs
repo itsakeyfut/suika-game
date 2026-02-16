@@ -74,6 +74,7 @@ pub struct LastCursorPosition {
 /// - `next_fruit`: The type of fruit to spawn (mutable to randomize after spawn)
 /// - `spawn_pos`: Current spawn position (X coordinate)
 /// - `fruit_states`: Query to check fruit spawn states
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_held_fruit(
     mut commands: Commands,
     mut next_fruit: ResMut<NextFruitType>,
@@ -223,6 +224,7 @@ pub fn detect_fruit_landing(
 /// - `mouse_button`: Mouse button input state
 /// - `keyboard`: Keyboard input state
 /// - `held_fruits`: Query for held fruits to drop
+#[allow(clippy::too_many_arguments)]
 pub fn handle_fruit_drop_input(
     mut commands: Commands,
     mouse_button: Res<ButtonInput<MouseButton>>,
@@ -379,9 +381,7 @@ pub fn update_spawn_position(
 
     // Clamp spawn position within container bounds
     // Use the actual fruit radius to allow the fruit to touch the wall
-    let container_width = physics_config
-        .map(|c| c.container_width)
-        .unwrap_or(600.0); // Fallback
+    let container_width = physics_config.map(|c| c.container_width).unwrap_or(600.0); // Fallback
     let max_x = container_width / 2.0 - held_fruit_radius;
     spawn_pos.x = spawn_pos.x.clamp(-max_x, max_x);
 
@@ -397,6 +397,143 @@ pub fn update_spawn_position(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::*;
+    use bevy::asset::Assets;
+
+    /// Helper to setup test app with required resources
+    fn setup_test_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+
+        // Create and add config assets
+        let mut fruits_assets = Assets::<FruitsConfig>::default();
+        let fruits_config = create_test_fruits_config();
+        let fruits_handle = fruits_assets.add(fruits_config);
+
+        let mut physics_assets = Assets::<PhysicsConfig>::default();
+        let physics_config = create_test_physics_config();
+        let physics_handle = physics_assets.add(physics_config);
+
+        app.insert_resource(fruits_assets);
+        app.insert_resource(FruitsConfigHandle(fruits_handle));
+        app.insert_resource(physics_assets);
+        app.insert_resource(PhysicsConfigHandle(physics_handle));
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+
+        app
+    }
+
+    fn create_test_fruits_config() -> FruitsConfig {
+        FruitsConfig {
+            fruits: vec![
+                FruitConfigEntry {
+                    name: "Cherry".to_string(),
+                    radius: 20.0,
+                    points: 10,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Strawberry".to_string(),
+                    radius: 30.0,
+                    points: 20,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Grape".to_string(),
+                    radius: 40.0,
+                    points: 40,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Dekopon".to_string(),
+                    radius: 50.0,
+                    points: 80,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Persimmon".to_string(),
+                    radius: 60.0,
+                    points: 160,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Apple".to_string(),
+                    radius: 70.0,
+                    points: 320,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Pear".to_string(),
+                    radius: 80.0,
+                    points: 640,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Peach".to_string(),
+                    radius: 90.0,
+                    points: 1280,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Pineapple".to_string(),
+                    radius: 100.0,
+                    points: 2560,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Melon".to_string(),
+                    radius: 110.0,
+                    points: 5120,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Watermelon".to_string(),
+                    radius: 120.0,
+                    points: 10240,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+            ],
+        }
+    }
+
+    fn create_test_physics_config() -> PhysicsConfig {
+        PhysicsConfig {
+            gravity: -980.0,
+            container_width: 600.0,
+            container_height: 800.0,
+            wall_thickness: 20.0,
+            boundary_line_y: 300.0,
+            wall_restitution: 0.2,
+            wall_friction: 0.5,
+            fruit_spawn_y_offset: 50.0,
+            fruit_linear_damping: 0.5,
+            fruit_angular_damping: 1.0,
+            keyboard_move_speed: 300.0,
+        }
+    }
 
     #[test]
     fn test_spawn_position_default() {
@@ -426,10 +563,7 @@ mod tests {
 
     #[test]
     fn test_spawn_held_fruit_creates_fruit() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Update, spawn_held_fruit);
 
         // Initial fruit count
@@ -457,10 +591,7 @@ mod tests {
 
     #[test]
     fn test_spawn_held_fruit_only_one_at_a_time() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Update, spawn_held_fruit);
 
         app.update();
@@ -485,10 +616,7 @@ mod tests {
 
     #[test]
     fn test_spawn_held_fruit_waits_for_falling_fruit() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Update, spawn_held_fruit);
 
         // Manually spawn a falling fruit
@@ -517,10 +645,7 @@ mod tests {
 
     #[test]
     fn test_handle_fruit_drop_input_space_key() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.init_resource::<ButtonInput<MouseButton>>();
         app.add_systems(Update, (spawn_held_fruit, handle_fruit_drop_input));
@@ -548,10 +673,7 @@ mod tests {
 
     #[test]
     fn test_handle_fruit_drop_input_mouse_click() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.init_resource::<ButtonInput<MouseButton>>();
         app.add_systems(Update, (spawn_held_fruit, handle_fruit_drop_input));
@@ -577,8 +699,7 @@ mod tests {
 
     #[test]
     fn test_update_spawn_position_arrow_keys() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
+        let mut app = setup_test_app();
         app.insert_resource(SpawnPosition { x: 0.0 });
         app.init_resource::<InputMode>();
         app.init_resource::<LastCursorPosition>();
@@ -600,8 +721,7 @@ mod tests {
 
     #[test]
     fn test_update_spawn_position_ad_keys() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
+        let mut app = setup_test_app();
         app.insert_resource(SpawnPosition { x: 0.0 });
         app.init_resource::<InputMode>();
         app.init_resource::<LastCursorPosition>();
@@ -623,8 +743,7 @@ mod tests {
 
     #[test]
     fn test_update_spawn_position_clamping() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
+        let mut app = setup_test_app();
 
         // Start at extreme position
         app.insert_resource(SpawnPosition { x: 10000.0 });
@@ -651,12 +770,9 @@ mod tests {
 
     #[test]
     fn test_update_spawn_position_moves_held_fruit() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
+        let mut app = setup_test_app();
         app.init_resource::<InputMode>();
         app.init_resource::<LastCursorPosition>();
-        app.init_resource::<NextFruitType>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, (spawn_held_fruit, update_spawn_position));
 
@@ -727,11 +843,8 @@ mod tests {
 
     #[test]
     fn test_spawn_held_fruit_after_landing() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
+        let mut app = setup_test_app();
         app.add_message::<CollisionEvent>();
-        app.init_resource::<SpawnPosition>();
-        app.init_resource::<NextFruitType>();
         app.add_systems(Update, (detect_fruit_landing, spawn_held_fruit));
 
         // Spawn initial held fruit
@@ -782,12 +895,9 @@ mod tests {
 
     #[test]
     fn test_update_spawn_position_does_not_move_falling_fruit() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
+        let mut app = setup_test_app();
         app.init_resource::<InputMode>();
         app.init_resource::<LastCursorPosition>();
-        app.init_resource::<NextFruitType>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.init_resource::<ButtonInput<MouseButton>>();
         app.add_systems(

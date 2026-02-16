@@ -81,10 +81,8 @@ pub mod prelude {
 
     // Config
     pub use crate::config::{
-        FruitConfigEntry, FruitsConfig, FruitsConfigHandle,
-        GameRulesConfig, GameRulesConfigHandle,
-        PhysicsConfig, PhysicsConfigHandle,
-        GameConfigPlugin,
+        FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin, GameRulesConfig,
+        GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle,
     };
 
     // Plugin

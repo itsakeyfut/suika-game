@@ -9,11 +9,14 @@
 use bevy::asset::io::Reader;
 use bevy::asset::{Asset, AssetLoader, LoadContext};
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::{Collider, ColliderMassProperties, Friction, Restitution, RapierConfiguration, DefaultRapierContext};
+use bevy_rapier2d::prelude::{
+    Collider, ColliderMassProperties, DefaultRapierContext, Friction, RapierConfiguration,
+    Restitution,
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::components::{Container, BottomWall, NextFruitPreview, Fruit};
+use crate::components::{BottomWall, Container, Fruit, NextFruitPreview};
 
 /// Fruit configuration asset loaded from `assets/config/fruits.ron`
 ///
@@ -149,11 +152,14 @@ impl Plugin for GameConfigPlugin {
             .insert_resource(GameRulesConfigHandle(game_rules_handle));
 
         // Add hot-reload systems
-        app.add_systems(Update, (
-            hot_reload_fruits_config,
-            hot_reload_physics_config,
-            hot_reload_game_rules_config,
-        ));
+        app.add_systems(
+            Update,
+            (
+                hot_reload_fruits_config,
+                hot_reload_physics_config,
+                hot_reload_game_rules_config,
+            ),
+        );
 
         info!("✅ GameConfigPlugin initialized");
         info!("🔍 All configs load requested (fruits, physics, game_rules)");
@@ -165,18 +171,22 @@ impl Plugin for GameConfigPlugin {
 /// Monitors for changes to the fruits.ron file and logs when updates are detected.
 /// When the config is modified, this system updates all existing fruit entities
 /// to reflect the new parameters.
+#[allow(clippy::type_complexity)]
 fn hot_reload_fruits_config(
     mut events: MessageReader<AssetEvent<FruitsConfig>>,
     config_assets: Res<Assets<FruitsConfig>>,
     config_handle: Res<FruitsConfigHandle>,
-    mut fruits: Query<(
-        &crate::fruit::FruitType,
-        &mut Sprite,
-        &mut Collider,
-        &mut Restitution,
-        &mut Friction,
-        &mut ColliderMassProperties,
-    ), With<crate::components::Fruit>>,
+    mut fruits: Query<
+        (
+            &crate::fruit::FruitType,
+            &mut Sprite,
+            &mut Collider,
+            &mut Restitution,
+            &mut Friction,
+            &mut ColliderMassProperties,
+        ),
+        With<crate::components::Fruit>,
+    >,
 ) {
     for event in events.read() {
         match event {
@@ -185,11 +195,22 @@ fn hot_reload_fruits_config(
             }
             AssetEvent::Modified { id: _ } => {
                 if let Some(config) = config_assets.get(&config_handle.0) {
-                    info!("🔥 Hot-reloading fruits config! Loaded {} fruit types", config.fruits.len());
+                    info!(
+                        "🔥 Hot-reloading fruits config! Loaded {} fruit types",
+                        config.fruits.len()
+                    );
 
                     // Update all existing fruit entities with new parameters
                     let mut updated_count = 0;
-                    for (fruit_type, mut sprite, mut collider, mut restitution, mut friction, mut mass_props) in fruits.iter_mut() {
+                    for (
+                        fruit_type,
+                        mut sprite,
+                        mut collider,
+                        mut restitution,
+                        mut friction,
+                        mut mass_props,
+                    ) in fruits.iter_mut()
+                    {
                         let params = fruit_type.parameters_from_config(config);
 
                         // Update visual size
@@ -207,7 +228,10 @@ fn hot_reload_fruits_config(
                     }
 
                     if updated_count > 0 {
-                        info!("✨ Updated {} fruit entities with new config parameters", updated_count);
+                        info!(
+                            "✨ Updated {} fruit entities with new config parameters",
+                            updated_count
+                        );
                     }
                 }
             }
@@ -304,10 +328,7 @@ impl AssetLoader for GameRulesConfigLoader {
 ///
 /// This function modifies the RapierConfiguration component to apply
 /// new gravity values immediately to all falling fruits.
-fn update_rapier_gravity(
-    rapier_config: &mut RapierConfiguration,
-    new_gravity: f32,
-) {
+fn update_rapier_gravity(rapier_config: &mut RapierConfiguration, new_gravity: f32) {
     rapier_config.gravity = Vec2::new(0.0, new_gravity);
     info!("🎯 Gravity updated to: {}", new_gravity);
 }
@@ -338,7 +359,10 @@ fn update_wall(
         // Update sprite
         sprite.custom_size = Some(Vec2::new(config.container_width, thickness));
 
-        info!("🔧 Updated bottom wall: y={}, width={}", new_y, config.container_width);
+        info!(
+            "🔧 Updated bottom wall: y={}, width={}",
+            new_y, config.container_width
+        );
     } else {
         // Side walls (left or right)
         // Determine which side based on current x position
@@ -358,7 +382,8 @@ fn update_wall(
         // Update sprite
         sprite.custom_size = Some(Vec2::new(thickness, config.container_height));
 
-        info!("🔧 Updated {} wall: x={}, height={}",
+        info!(
+            "🔧 Updated {} wall: x={}, height={}",
             if is_left { "left" } else { "right" },
             new_x,
             config.container_height
@@ -395,7 +420,8 @@ fn update_preview(
 
     sprite.custom_size = Some(Vec2::splat(preview_size));
 
-    info!("🎨 Preview display updated to position ({:.1}, {:.1}), size={:.1}",
+    info!(
+        "🎨 Preview display updated to position ({:.1}, {:.1}), size={:.1}",
         new_x, new_y, preview_size
     );
 }
@@ -410,7 +436,8 @@ fn update_game_timers(
     combo_timer.combo_max = config.combo_max;
     game_over_timer.warning_threshold = config.game_over_timer;
 
-    info!("⏱️ Game timers updated: combo_window={:.1}s, combo_max={}, game_over={:.1}s",
+    info!(
+        "⏱️ Game timers updated: combo_window={:.1}s, combo_max={}, game_over={:.1}s",
         config.combo_window, config.combo_max, config.game_over_timer
     );
 }
@@ -419,13 +446,22 @@ fn update_game_timers(
 ///
 /// Monitors for changes to the physics.ron file and logs when updates are detected.
 /// When the config is modified, the changes are applied to game physics systems.
+#[allow(clippy::type_complexity)]
 fn hot_reload_physics_config(
     mut events: MessageReader<AssetEvent<PhysicsConfig>>,
     config_assets: Res<Assets<PhysicsConfig>>,
     config_handle: Res<PhysicsConfigHandle>,
     mut rapier_query: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
     mut commands: Commands,
-    mut walls_query: Query<(&mut Transform, &mut Collider, &mut Sprite, Option<&BottomWall>), (With<Container>, Without<Fruit>)>,
+    mut walls_query: Query<
+        (
+            &mut Transform,
+            &mut Collider,
+            &mut Sprite,
+            Option<&BottomWall>,
+        ),
+        (With<Container>, Without<Fruit>),
+    >,
     fruits_query: Query<(Entity, &Transform), (With<Fruit>, Without<Container>)>,
 ) {
     for event in events.read() {
@@ -436,8 +472,10 @@ fn hot_reload_physics_config(
             AssetEvent::Modified { id: _ } => {
                 if let Some(config) = config_assets.get(&config_handle.0) {
                     info!("🔥 Hot-reloading physics config!");
-                    info!("   Gravity: {}, Container: {}x{}",
-                        config.gravity, config.container_width, config.container_height);
+                    info!(
+                        "   Gravity: {}, Container: {}x{}",
+                        config.gravity, config.container_width, config.container_height
+                    );
 
                     // CRITICAL: Delete out-of-bounds fruits BEFORE updating walls
                     let mut deleted_count = 0;
@@ -445,9 +483,9 @@ fn hot_reload_physics_config(
                         if is_out_of_bounds(transform.translation, config) {
                             commands.entity(entity).despawn();
                             deleted_count += 1;
-                            info!("🗑️ Deleted out-of-bounds fruit at ({:.1}, {:.1})",
-                                transform.translation.x,
-                                transform.translation.y
+                            info!(
+                                "🗑️ Deleted out-of-bounds fruit at ({:.1}, {:.1})",
+                                transform.translation.x, transform.translation.y
                             );
                         }
                     }
@@ -463,13 +501,21 @@ fn hot_reload_physics_config(
                     }
 
                     // Update container walls
-                    for (mut transform, mut collider, mut sprite, bottom_wall) in walls_query.iter_mut() {
-                        update_wall(&mut transform, &mut collider, &mut sprite, bottom_wall.is_some(), config);
+                    for (mut transform, mut collider, mut sprite, bottom_wall) in
+                        walls_query.iter_mut()
+                    {
+                        update_wall(
+                            &mut transform,
+                            &mut collider,
+                            &mut sprite,
+                            bottom_wall.is_some(),
+                            config,
+                        );
                     }
 
-                    info!("✨ Container walls updated to width={}, height={}",
-                        config.container_width,
-                        config.container_height
+                    info!(
+                        "✨ Container walls updated to width={}, height={}",
+                        config.container_width, config.container_height
                     );
                 }
             }
@@ -485,6 +531,7 @@ fn hot_reload_physics_config(
 ///
 /// Monitors for changes to the game_rules.ron file and logs when updates are detected.
 /// When the config is modified, the changes are applied to game mechanics.
+#[allow(clippy::too_many_arguments)]
 fn hot_reload_game_rules_config(
     mut events: MessageReader<AssetEvent<GameRulesConfig>>,
     config_assets: Res<Assets<GameRulesConfig>>,
@@ -511,26 +558,27 @@ fn hot_reload_game_rules_config(
             AssetEvent::Modified { id: _ } => {
                 if let Some(config) = config_assets.get(&config_handle.0) {
                     info!("🔥 Hot-reloading game rules config!");
-                    info!("   Spawnable fruits: {}, Combo window: {}s, Game over timer: {}s",
-                        config.spawnable_fruit_count, config.combo_window, config.game_over_timer);
+                    info!(
+                        "   Spawnable fruits: {}, Combo window: {}s, Game over timer: {}s",
+                        config.spawnable_fruit_count, config.combo_window, config.game_over_timer
+                    );
 
                     // Update game timers
                     update_game_timers(&mut combo_timer, &mut game_over_timer, config);
 
                     // Update preview display if all configs are loaded
-                    if let Some(physics_config) = physics_assets.get(&physics_handle.0) {
-                        if let Some(fruits_config) = fruits_assets.get(&fruits_handle.0) {
-                            if let Ok((mut transform, mut sprite)) = preview_query.single_mut() {
-                                update_preview(
-                                    &mut transform,
-                                    &mut sprite,
-                                    physics_config,
-                                    config,
-                                    fruits_config,
-                                    next_fruit.get(),
-                                );
-                            }
-                        }
+                    if let Some(physics_config) = physics_assets.get(&physics_handle.0)
+                        && let Some(fruits_config) = fruits_assets.get(&fruits_handle.0)
+                        && let Ok((mut transform, mut sprite)) = preview_query.single_mut()
+                    {
+                        update_preview(
+                            &mut transform,
+                            &mut sprite,
+                            physics_config,
+                            config,
+                            fruits_config,
+                            next_fruit.get(),
+                        );
                     }
                 }
             }

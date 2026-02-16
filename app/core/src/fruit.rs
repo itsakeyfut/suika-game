@@ -3,8 +3,8 @@
 //! This module defines the fruit evolution system with 11 fruit types,
 //! from Cherry (smallest) to Watermelon (largest).
 
-use bevy::prelude::*;
 use crate::config::FruitsConfig;
+use bevy::prelude::*;
 
 /// Represents the 11 fruit types in the evolution chain
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component)]
@@ -98,7 +98,6 @@ impl FruitType {
         }
     }
 
-
     /// Returns the array of fruits that can be spawned by the player
     ///
     /// Only the first 5 fruits (Cherry through Persimmon) can be spawned.
@@ -165,7 +164,6 @@ mod tests {
         assert_eq!(spawnable[3], FruitType::Dekopon);
         assert_eq!(spawnable[4], FruitType::Persimmon);
     }
-
 
     #[test]
     fn test_placeholder_colors_are_distinct() {

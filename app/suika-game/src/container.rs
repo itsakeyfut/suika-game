@@ -137,9 +137,36 @@ pub fn setup_container(
 mod tests {
     use super::*;
 
+    /// Helper to create a test app with necessary resources
+    fn setup_test_app() -> App {
+        let mut app = App::new();
+
+        // Add required resources for setup_container
+        let mut physics_assets = Assets::<PhysicsConfig>::default();
+        let physics_config = PhysicsConfig {
+            gravity: -980.0,
+            container_width: 600.0,
+            container_height: 800.0,
+            wall_thickness: 20.0,
+            boundary_line_y: 300.0,
+            wall_restitution: 0.2,
+            wall_friction: 0.5,
+            fruit_spawn_y_offset: 50.0,
+            fruit_linear_damping: 0.5,
+            fruit_angular_damping: 1.0,
+            keyboard_move_speed: 300.0,
+        };
+        let handle = physics_assets.add(physics_config);
+
+        app.insert_resource(physics_assets);
+        app.insert_resource(PhysicsConfigHandle(handle));
+
+        app
+    }
+
     #[test]
     fn test_container_setup() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -151,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_container_rigid_bodies() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -167,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_container_colliders() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -179,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_container_friction() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -192,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_container_restitution() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -205,15 +232,15 @@ mod tests {
                 // Bottom wall should have no bounce
                 assert_eq!(restitution.coefficient, 0.0);
             } else {
-                // Side walls should have some bounce
-                assert_eq!(restitution.coefficient, 0.3);
+                // Side walls should have some bounce (from physics.ron)
+                assert_eq!(restitution.coefficient, 0.2);
             }
         }
     }
 
     #[test]
     fn test_container_sprites() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -225,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_boundary_line_exists() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -237,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_boundary_line_position() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -254,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_boundary_line_no_physics() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -277,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_boundary_line_sprite() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 

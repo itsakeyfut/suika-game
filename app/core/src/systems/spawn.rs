@@ -37,15 +37,21 @@ use crate::fruit::FruitType;
 /// # use bevy::math::Vec2;
 /// # use suika_game_core::systems::spawn::spawn_fruit;
 /// # use suika_game_core::fruit::FruitType;
-/// # use suika_game_core::config::FruitsConfig;
-/// fn spawn_system(mut commands: Commands, config: Res<FruitsConfig>) {
-///     let fruit_entity = spawn_fruit(
-///         &mut commands,
-///         FruitType::Cherry,
-///         Vec2::new(0.0, 300.0),
-///         &config,
-///     );
-///     info!("Spawned fruit with ID: {:?}", fruit_entity);
+/// # use suika_game_core::config::{FruitsConfig, FruitsConfigHandle};
+/// fn spawn_system(
+///     mut commands: Commands,
+///     fruits_handle: Res<FruitsConfigHandle>,
+///     fruits_assets: Res<Assets<FruitsConfig>>,
+/// ) {
+///     if let Some(config) = fruits_assets.get(&fruits_handle.0) {
+///         let fruit_entity = spawn_fruit(
+///             &mut commands,
+///             FruitType::Cherry,
+///             Vec2::new(0.0, 300.0),
+///             config,
+///         );
+///         info!("Spawned fruit with ID: {:?}", fruit_entity);
+///     }
 /// }
 /// ```
 pub fn spawn_fruit(
@@ -197,7 +203,12 @@ mod tests {
         let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Cherry, Vec2::new(0.0, 100.0), &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            FruitType::Cherry,
+            Vec2::new(0.0, 100.0),
+            &config,
+        );
 
         // Flush commands to apply them
         app.update();
@@ -216,7 +227,12 @@ mod tests {
         let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Strawberry, Vec2::new(10.0, 20.0), &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            FruitType::Strawberry,
+            Vec2::new(10.0, 20.0),
+            &config,
+        );
 
         app.update();
 
@@ -279,7 +295,12 @@ mod tests {
         let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Peach, Vec2::new(0.0, 0.0), &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            FruitType::Peach,
+            Vec2::new(0.0, 0.0),
+            &config,
+        );
 
         app.update();
 
@@ -317,7 +338,12 @@ mod tests {
         let config = create_test_config();
 
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, FruitType::Pineapple, Vec2::new(0.0, 0.0), &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            FruitType::Pineapple,
+            Vec2::new(0.0, 0.0),
+            &config,
+        );
 
         app.update();
 
