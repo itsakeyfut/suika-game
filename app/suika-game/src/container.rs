@@ -43,7 +43,10 @@ pub fn setup_container(mut commands: Commands) {
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
         Friction::coefficient(0.5),
-        Restitution::coefficient(0.3),
+        Restitution {
+            coefficient: 0.3,
+            combine_rule: CoefficientCombineRule::Min,
+        },
         ActiveEvents::COLLISION_EVENTS,
         Transform::from_xyz(-half_width - wall_thickness / 2.0, 0.0, 0.0),
         Sprite {
@@ -59,7 +62,10 @@ pub fn setup_container(mut commands: Commands) {
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
         Friction::coefficient(0.5),
-        Restitution::coefficient(0.3),
+        Restitution {
+            coefficient: 0.3,
+            combine_rule: CoefficientCombineRule::Min,
+        },
         ActiveEvents::COLLISION_EVENTS,
         Transform::from_xyz(half_width + wall_thickness / 2.0, 0.0, 0.0),
         Sprite {
@@ -69,14 +75,17 @@ pub fn setup_container(mut commands: Commands) {
         },
     ));
 
-    // Bottom wall
+    // Bottom wall (no bounce - matches original Suika Game behavior)
     commands.spawn((
         Container,
         BottomWall, // Marker for landing detection
         RigidBody::Fixed,
         Collider::cuboid(half_width + wall_thickness, wall_thickness / 2.0),
         Friction::coefficient(0.5),
-        Restitution::coefficient(0.3),
+        Restitution {
+            coefficient: 0.0, // No bounce on ground
+            combine_rule: CoefficientCombineRule::Min,
+        },
         ActiveEvents::COLLISION_EVENTS,
         Transform::from_xyz(0.0, -half_height - wall_thickness / 2.0, 0.0),
         Sprite {
@@ -169,10 +178,18 @@ mod tests {
         app.add_systems(Startup, setup_container);
         app.update();
 
-        // Verify restitution coefficient
-        let mut query = app.world_mut().query::<(&Container, &Restitution)>();
-        for (_, restitution) in query.iter(app.world()) {
-            assert_eq!(restitution.coefficient, 0.3);
+        // Verify restitution coefficient for side walls (0.3)
+        let mut query = app
+            .world_mut()
+            .query::<(&Container, &Restitution, Option<&BottomWall>)>();
+        for (_, restitution, bottom_wall) in query.iter(app.world()) {
+            if bottom_wall.is_some() {
+                // Bottom wall should have no bounce
+                assert_eq!(restitution.coefficient, 0.0);
+            } else {
+                // Side walls should have some bounce
+                assert_eq!(restitution.coefficient, 0.3);
+            }
         }
     }
 
