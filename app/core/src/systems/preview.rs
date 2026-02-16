@@ -88,11 +88,16 @@ pub fn update_fruit_preview(
     for (mut sprite, mut visibility) in preview_query.iter_mut() {
         // Update preview visibility based on held or falling fruit existence
         // Keep preview visible during fruit drop (Held -> Falling transition)
-        *visibility = if has_held_fruit || has_falling_fruit {
+        let desired = if has_held_fruit || has_falling_fruit {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
+
+        // Only update if changed to avoid triggering change detection unnecessarily
+        if *visibility != desired {
+            *visibility = desired;
+        }
 
         // Update preview when next fruit type changes
         if next_fruit.is_changed() {

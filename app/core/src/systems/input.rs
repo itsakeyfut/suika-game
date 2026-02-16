@@ -104,7 +104,7 @@ pub fn spawn_held_fruit(
         .count();
 
     if held_count > 0 || falling_count > 0 || landed_count > 0 {
-        info!(
+        trace!(
             "Fruit states - Held: {}, Falling: {}, Landed: {}",
             held_count, falling_count, landed_count
         );
