@@ -9,9 +9,11 @@
 use bevy::asset::io::Reader;
 use bevy::asset::{Asset, AssetLoader, LoadContext};
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::{Collider, ColliderMassProperties, Friction, Restitution};
+use bevy_rapier2d::prelude::{Collider, ColliderMassProperties, Friction, Restitution, RapierConfiguration, DefaultRapierContext};
 use serde::Deserialize;
 use std::collections::HashMap;
+
+use crate::components::{Container, BottomWall, NextFruitPreview, Fruit};
 
 /// Fruit configuration asset loaded from `assets/config/fruits.ron`
 ///
@@ -298,6 +300,106 @@ impl AssetLoader for GameRulesConfigLoader {
     }
 }
 
+/// Updates Rapier's gravity setting when physics config changes
+///
+/// This function modifies the RapierConfiguration component to apply
+/// new gravity values immediately to all falling fruits.
+fn update_rapier_gravity(
+    rapier_config: &mut RapierConfiguration,
+    new_gravity: f32,
+) {
+    rapier_config.gravity = Vec2::new(0.0, new_gravity);
+    info!("🎯 Gravity updated to: {}", new_gravity);
+}
+
+/// Updates a single container wall's position and collider when dimensions change
+///
+/// This function recalculates wall position based on new container dimensions
+/// and updates the Transform, Collider, and Sprite components.
+fn update_wall(
+    transform: &mut Transform,
+    collider: &mut Collider,
+    sprite: &mut Sprite,
+    is_bottom: bool,
+    config: &PhysicsConfig,
+) {
+    let half_width = config.container_width / 2.0;
+    let half_height = config.container_height / 2.0;
+    let thickness = config.wall_thickness;
+
+    if is_bottom {
+        // Bottom wall
+        let new_y = -half_height - thickness / 2.0;
+        transform.translation.y = new_y;
+
+        // Update collider
+        *collider = Collider::cuboid(half_width, thickness / 2.0);
+
+        // Update sprite
+        sprite.custom_size = Some(Vec2::new(config.container_width, thickness));
+
+        info!("🔧 Updated bottom wall: y={}, width={}", new_y, config.container_width);
+    } else {
+        // Side walls (left or right)
+        // Determine which side based on current x position
+        let is_left = transform.translation.x < 0.0;
+
+        let new_x = if is_left {
+            -half_width - thickness / 2.0
+        } else {
+            half_width + thickness / 2.0
+        };
+
+        transform.translation.x = new_x;
+
+        // Update collider
+        *collider = Collider::cuboid(thickness / 2.0, half_height);
+
+        // Update sprite
+        sprite.custom_size = Some(Vec2::new(thickness, config.container_height));
+
+        info!("🔧 Updated {} wall: x={}, height={}",
+            if is_left { "left" } else { "right" },
+            new_x,
+            config.container_height
+        );
+    }
+}
+
+/// Checks if a fruit position is outside container bounds
+fn is_out_of_bounds(position: Vec3, config: &PhysicsConfig) -> bool {
+    let max_x = config.container_width / 2.0;
+    let max_y = config.container_height / 2.0;
+    position.x.abs() > max_x || position.y.abs() > max_y
+}
+
+/// Updates the preview display position and size when config changes
+fn update_preview(
+    transform: &mut Transform,
+    sprite: &mut Sprite,
+    physics_config: &PhysicsConfig,
+    rules_config: &GameRulesConfig,
+    fruits_config: &FruitsConfig,
+    next_fruit_type: crate::fruit::FruitType,
+) {
+    // Calculate new position based on container dimensions
+    let new_x = physics_config.container_width / 2.0 + rules_config.preview_x_offset;
+    let new_y = physics_config.container_height / 2.0 + rules_config.preview_y_offset;
+
+    transform.translation.x = new_x;
+    transform.translation.y = new_y;
+
+    // Update sprite size based on fruit radius and preview scale
+    let params = next_fruit_type.parameters_from_config(fruits_config);
+    let preview_size = params.radius * 2.0 * rules_config.preview_scale;
+
+    sprite.custom_size = Some(Vec2::splat(preview_size));
+
+    info!("🎨 Preview display updated to position ({:.1}, {:.1}), size={:.1}",
+        new_x, new_y, preview_size
+    );
+}
+
 /// Handles hot-reloading of physics configuration
 ///
 /// Monitors for changes to the physics.ron file and logs when updates are detected.
@@ -306,6 +408,10 @@ fn hot_reload_physics_config(
     mut events: MessageReader<AssetEvent<PhysicsConfig>>,
     config_assets: Res<Assets<PhysicsConfig>>,
     config_handle: Res<PhysicsConfigHandle>,
+    mut rapier_query: Query<&mut RapierConfiguration, With<DefaultRapierContext>>,
+    mut commands: Commands,
+    mut walls_query: Query<(&mut Transform, &mut Collider, &mut Sprite, Option<&BottomWall>), (With<Container>, Without<Fruit>)>,
+    fruits_query: Query<(Entity, &Transform), (With<Fruit>, Without<Container>)>,
 ) {
     for event in events.read() {
         match event {
@@ -317,7 +423,39 @@ fn hot_reload_physics_config(
                     info!("🔥 Hot-reloading physics config!");
                     info!("   Gravity: {}, Container: {}x{}",
                         config.gravity, config.container_width, config.container_height);
-                    // Note: Physics changes will be picked up by systems that read the config
+
+                    // CRITICAL: Delete out-of-bounds fruits BEFORE updating walls
+                    let mut deleted_count = 0;
+                    for (entity, transform) in fruits_query.iter() {
+                        if is_out_of_bounds(transform.translation, config) {
+                            commands.entity(entity).despawn();
+                            deleted_count += 1;
+                            info!("🗑️ Deleted out-of-bounds fruit at ({:.1}, {:.1})",
+                                transform.translation.x,
+                                transform.translation.y
+                            );
+                        }
+                    }
+                    if deleted_count > 0 {
+                        info!("✨ Deleted {} out-of-bounds fruits", deleted_count);
+                    }
+
+                    // Update gravity immediately
+                    if let Ok(mut rapier_config) = rapier_query.single_mut() {
+                        update_rapier_gravity(&mut rapier_config, config.gravity);
+                    } else {
+                        warn!("⚠️ Failed to find RapierConfiguration component");
+                    }
+
+                    // Update container walls
+                    for (mut transform, mut collider, mut sprite, bottom_wall) in walls_query.iter_mut() {
+                        update_wall(&mut transform, &mut collider, &mut sprite, bottom_wall.is_some(), config);
+                    }
+
+                    info!("✨ Container walls updated to width={}, height={}",
+                        config.container_width,
+                        config.container_height
+                    );
                 }
             }
             AssetEvent::Removed { id: _ } => {
@@ -336,6 +474,12 @@ fn hot_reload_game_rules_config(
     mut events: MessageReader<AssetEvent<GameRulesConfig>>,
     config_assets: Res<Assets<GameRulesConfig>>,
     config_handle: Res<GameRulesConfigHandle>,
+    mut preview_query: Query<(&mut Transform, &mut Sprite), With<NextFruitPreview>>,
+    physics_handle: Res<PhysicsConfigHandle>,
+    physics_assets: Res<Assets<PhysicsConfig>>,
+    fruits_handle: Res<FruitsConfigHandle>,
+    fruits_assets: Res<Assets<FruitsConfig>>,
+    next_fruit: Res<crate::resources::NextFruitType>,
 ) {
     for event in events.read() {
         match event {
@@ -347,7 +491,22 @@ fn hot_reload_game_rules_config(
                     info!("🔥 Hot-reloading game rules config!");
                     info!("   Spawnable fruits: {}, Combo window: {}s, Game over timer: {}s",
                         config.spawnable_fruit_count, config.combo_window, config.game_over_timer);
-                    // Note: Game rule changes will be picked up by systems that read the config
+
+                    // Update preview display if all configs are loaded
+                    if let Some(physics_config) = physics_assets.get(&physics_handle.0) {
+                        if let Some(fruits_config) = fruits_assets.get(&fruits_handle.0) {
+                            if let Ok((mut transform, mut sprite)) = preview_query.single_mut() {
+                                update_preview(
+                                    &mut transform,
+                                    &mut sprite,
+                                    physics_config,
+                                    config,
+                                    fruits_config,
+                                    next_fruit.get(),
+                                );
+                            }
+                        }
+                    }
                 }
             }
             AssetEvent::Removed { id: _ } => {
@@ -439,5 +598,47 @@ GameRulesConfig(
         assert_eq!(config.game_over_timer, 3.0);
         assert_eq!(config.combo_bonuses.get(&2), Some(&1.1));
         assert_eq!(config.combo_bonuses.get(&5), Some(&1.5));
+    }
+
+    #[test]
+    fn test_update_rapier_gravity() {
+        use bevy_rapier2d::prelude::RapierConfiguration;
+
+        let mut rapier_config = RapierConfiguration::new(100.0); // 100 pixels per meter
+        rapier_config.gravity = Vec2::new(0.0, -980.0);
+
+        // Update to new gravity value
+        update_rapier_gravity(&mut rapier_config, -1980.0);
+
+        // Verify the gravity was updated
+        assert_eq!(rapier_config.gravity.x, 0.0);
+        assert_eq!(rapier_config.gravity.y, -1980.0);
+    }
+
+    #[test]
+    fn test_is_out_of_bounds() {
+        let config = PhysicsConfig {
+            gravity: -980.0,
+            container_width: 400.0,
+            container_height: 600.0,
+            wall_thickness: 20.0,
+            boundary_line_y: 300.0,
+            wall_restitution: 0.2,
+            wall_friction: 0.5,
+            fruit_spawn_y_offset: 50.0,
+            fruit_linear_damping: 0.5,
+            fruit_angular_damping: 1.0,
+            keyboard_move_speed: 300.0,
+        };
+
+        // Test in bounds
+        assert!(!is_out_of_bounds(Vec3::new(0.0, 0.0, 0.0), &config));
+        assert!(!is_out_of_bounds(Vec3::new(100.0, 200.0, 0.0), &config));
+
+        // Test out of bounds (container_width/2 = 200.0, container_height/2 = 300.0)
+        assert!(is_out_of_bounds(Vec3::new(300.0, 0.0, 0.0), &config)); // Outside X
+        assert!(is_out_of_bounds(Vec3::new(0.0, 400.0, 0.0), &config)); // Outside Y
+        assert!(is_out_of_bounds(Vec3::new(-250.0, 0.0, 0.0), &config)); // Outside -X
+        assert!(is_out_of_bounds(Vec3::new(0.0, -350.0, 0.0), &config)); // Outside -Y
     }
 }
