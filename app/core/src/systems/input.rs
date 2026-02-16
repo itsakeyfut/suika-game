@@ -196,9 +196,11 @@ pub fn handle_fruit_drop_input(
                 let params = fruit_type.parameters();
 
                 // Convert to dynamic rigid body with physics properties
+                // Reset velocity to prevent diagonal falling due to kinematic movement
                 commands.entity(entity).insert((
                     RigidBody::Dynamic,
-                    Restitution::coefficient(params.restitution),
+                    Velocity::zero(), // Reset velocity to drop straight down
+                    Restitution::coefficient(0.0), // No bounce
                     Friction::coefficient(params.friction),
                     ColliderMassProperties::Mass(params.mass),
                     Damping {
@@ -239,7 +241,7 @@ pub fn update_spawn_position(
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut spawn_pos: ResMut<SpawnPosition>,
-    mut held_fruits: Query<(&mut Transform, &FruitSpawnState), With<Fruit>>,
+    mut held_fruits: Query<(&mut Transform, &FruitSpawnState, &FruitType), With<Fruit>>,
     time: Res<Time>,
 ) {
     // Handle keyboard movement (Arrow keys or A/D keys)
@@ -263,14 +265,21 @@ pub fn update_spawn_position(
         }
     }
 
+    // Get the held fruit's radius for proper clamping
+    let held_fruit_radius = held_fruits
+        .iter()
+        .find(|(_, state, _)| **state == FruitSpawnState::Held)
+        .map(|(_, _, fruit_type)| fruit_type.parameters().radius)
+        .unwrap_or(20.0); // Default to smallest fruit if none found
+
     // Clamp spawn position within container bounds
-    // Leave margin to prevent spawning too close to walls
-    let max_x = physics::CONTAINER_WIDTH / 2.0 - 40.0;
+    // Use the actual fruit radius to allow the fruit to touch the wall
+    let max_x = physics::CONTAINER_WIDTH / 2.0 - held_fruit_radius;
     spawn_pos.x = spawn_pos.x.clamp(-max_x, max_x);
 
     // Update ONLY held fruit position to match spawn position
     // Falling and Landed fruits are not affected
-    for (mut transform, spawn_state) in held_fruits.iter_mut() {
+    for (mut transform, spawn_state, _) in held_fruits.iter_mut() {
         if *spawn_state == FruitSpawnState::Held {
             transform.translation.x = spawn_pos.x;
         }
