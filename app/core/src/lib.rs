@@ -63,6 +63,7 @@ pub mod prelude {
 
     // Resources
     pub use crate::resources::{ComboTimer, GameOverTimer, GameState, NextFruitType};
+    pub use crate::systems::input::SpawnPosition;
 
     // States
     pub use crate::states::AppState;
