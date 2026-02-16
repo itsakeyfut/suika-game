@@ -16,7 +16,7 @@ use bevy_rapier2d::prelude::{
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::components::{BottomWall, Container, Fruit, NextFruitPreview};
+use crate::components::{BottomWall, Container, Fruit, LeftWall, NextFruitPreview};
 
 /// Fruit configuration asset loaded from `assets/config/fruits.ron`
 ///
@@ -202,6 +202,7 @@ fn hot_reload_fruits_config(
 
                     // Update all existing fruit entities with new parameters
                     let mut updated_count = 0;
+                    let mut skipped_count = 0;
                     for (
                         fruit_type,
                         mut sprite,
@@ -211,7 +212,15 @@ fn hot_reload_fruits_config(
                         mut mass_props,
                     ) in fruits.iter_mut()
                     {
-                        let params = fruit_type.parameters_from_config(config);
+                        // Use try_parameters_from_config for safe hot-reload
+                        let Some(params) = fruit_type.try_parameters_from_config(config) else {
+                            warn!(
+                                "⚠️ No config entry for {:?} (index {}), skipping update",
+                                fruit_type, *fruit_type as usize
+                            );
+                            skipped_count += 1;
+                            continue;
+                        };
 
                         // Update visual size
                         sprite.custom_size = Some(Vec2::splat(params.radius * 2.0));
@@ -231,6 +240,12 @@ fn hot_reload_fruits_config(
                         info!(
                             "✨ Updated {} fruit entities with new config parameters",
                             updated_count
+                        );
+                    }
+                    if skipped_count > 0 {
+                        warn!(
+                            "⚠️ Skipped {} fruit entities due to missing config entries",
+                            skipped_count
                         );
                     }
                 }
@@ -337,11 +352,15 @@ fn update_rapier_gravity(rapier_config: &mut RapierConfiguration, new_gravity: f
 ///
 /// This function recalculates wall position based on new container dimensions
 /// and updates the Transform, Collider, and Sprite components.
+///
+/// Uses marker components (LeftWall, RightWall, BottomWall) to identify walls
+/// instead of relying on position-based heuristics.
 fn update_wall(
     transform: &mut Transform,
     collider: &mut Collider,
     sprite: &mut Sprite,
     is_bottom: bool,
+    is_left: bool,
     config: &PhysicsConfig,
 ) {
     let half_width = config.container_width / 2.0;
@@ -365,9 +384,6 @@ fn update_wall(
         );
     } else {
         // Side walls (left or right)
-        // Determine which side based on current x position
-        let is_left = transform.translation.x < 0.0;
-
         let new_x = if is_left {
             -half_width - thickness / 2.0
         } else {
@@ -392,10 +408,13 @@ fn update_wall(
 }
 
 /// Checks if a fruit position is outside container bounds
-fn is_out_of_bounds(position: Vec3, config: &PhysicsConfig) -> bool {
+///
+/// Takes the fruit's radius into account to detect fruits that are partially
+/// outside the container (not just their center point).
+fn is_out_of_bounds(position: Vec3, radius: f32, config: &PhysicsConfig) -> bool {
     let max_x = config.container_width / 2.0;
     let max_y = config.container_height / 2.0;
-    position.x.abs() > max_x || position.y.abs() > max_y
+    position.x.abs() + radius > max_x || position.y.abs() + radius > max_y
 }
 
 /// Updates the preview display position and size when config changes
@@ -415,15 +434,21 @@ fn update_preview(
     transform.translation.y = new_y;
 
     // Update sprite size based on fruit radius and preview scale
-    let params = next_fruit_type.parameters_from_config(fruits_config);
-    let preview_size = params.radius * 2.0 * rules_config.preview_scale;
+    // Use try_parameters_from_config for safe hot-reload
+    if let Some(params) = next_fruit_type.try_parameters_from_config(fruits_config) {
+        let preview_size = params.radius * 2.0 * rules_config.preview_scale;
+        sprite.custom_size = Some(Vec2::splat(preview_size));
 
-    sprite.custom_size = Some(Vec2::splat(preview_size));
-
-    info!(
-        "🎨 Preview display updated to position ({:.1}, {:.1}), size={:.1}",
-        new_x, new_y, preview_size
-    );
+        info!(
+            "🎨 Preview display updated to position ({:.1}, {:.1}), size={:.1}",
+            new_x, new_y, preview_size
+        );
+    } else {
+        warn!(
+            "⚠️ No config entry for preview fruit {:?}, keeping previous size",
+            next_fruit_type
+        );
+    }
 }
 
 /// Updates game timer resources when game rules config changes
@@ -446,7 +471,7 @@ fn update_game_timers(
 ///
 /// Monitors for changes to the physics.ron file and logs when updates are detected.
 /// When the config is modified, the changes are applied to game physics systems.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn hot_reload_physics_config(
     mut events: MessageReader<AssetEvent<PhysicsConfig>>,
     config_assets: Res<Assets<PhysicsConfig>>,
@@ -459,10 +484,16 @@ fn hot_reload_physics_config(
             &mut Collider,
             &mut Sprite,
             Option<&BottomWall>,
+            Option<&LeftWall>,
         ),
         (With<Container>, Without<Fruit>),
     >,
-    fruits_query: Query<(Entity, &Transform), (With<Fruit>, Without<Container>)>,
+    fruits_query: Query<
+        (Entity, &Transform, &crate::fruit::FruitType),
+        (With<Fruit>, Without<Container>),
+    >,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
 ) {
     for event in events.read() {
         match event {
@@ -479,13 +510,25 @@ fn hot_reload_physics_config(
 
                     // CRITICAL: Delete out-of-bounds fruits BEFORE updating walls
                     let mut deleted_count = 0;
-                    for (entity, transform) in fruits_query.iter() {
-                        if is_out_of_bounds(transform.translation, config) {
+                    for (entity, transform, fruit_type) in fruits_query.iter() {
+                        // Get fruit radius from config, fallback to 20.0 if not available
+                        let radius = if let Some(fruits_config) =
+                            fruits_config_assets.get(&fruits_config_handle.0)
+                        {
+                            fruit_type
+                                .try_parameters_from_config(fruits_config)
+                                .map(|p| p.radius)
+                                .unwrap_or(20.0)
+                        } else {
+                            20.0
+                        };
+
+                        if is_out_of_bounds(transform.translation, radius, config) {
                             commands.entity(entity).despawn();
                             deleted_count += 1;
                             info!(
-                                "🗑️ Deleted out-of-bounds fruit at ({:.1}, {:.1})",
-                                transform.translation.x, transform.translation.y
+                                "🗑️ Deleted out-of-bounds fruit {:?} at ({:.1}, {:.1}), radius={}",
+                                fruit_type, transform.translation.x, transform.translation.y, radius
                             );
                         }
                     }
@@ -501,7 +544,7 @@ fn hot_reload_physics_config(
                     }
 
                     // Update container walls
-                    for (mut transform, mut collider, mut sprite, bottom_wall) in
+                    for (mut transform, mut collider, mut sprite, bottom_wall, left_wall) in
                         walls_query.iter_mut()
                     {
                         update_wall(
@@ -509,6 +552,7 @@ fn hot_reload_physics_config(
                             &mut collider,
                             &mut sprite,
                             bottom_wall.is_some(),
+                            left_wall.is_some(),
                             config,
                         );
                     }
@@ -704,14 +748,37 @@ GameRulesConfig(
             keyboard_move_speed: 300.0,
         };
 
-        // Test in bounds
-        assert!(!is_out_of_bounds(Vec3::new(0.0, 0.0, 0.0), &config));
-        assert!(!is_out_of_bounds(Vec3::new(100.0, 200.0, 0.0), &config));
+        let radius = 20.0; // Fruit radius
+
+        // Test in bounds (center point within bounds minus radius)
+        assert!(!is_out_of_bounds(Vec3::new(0.0, 0.0, 0.0), radius, &config));
+        assert!(!is_out_of_bounds(
+            Vec3::new(100.0, 200.0, 0.0),
+            radius,
+            &config
+        ));
 
         // Test out of bounds (container_width/2 = 200.0, container_height/2 = 300.0)
-        assert!(is_out_of_bounds(Vec3::new(300.0, 0.0, 0.0), &config)); // Outside X
-        assert!(is_out_of_bounds(Vec3::new(0.0, 400.0, 0.0), &config)); // Outside Y
-        assert!(is_out_of_bounds(Vec3::new(-250.0, 0.0, 0.0), &config)); // Outside -X
-        assert!(is_out_of_bounds(Vec3::new(0.0, -350.0, 0.0), &config)); // Outside -Y
+        // Taking radius into account: max_x = 200 - 20 = 180, max_y = 300 - 20 = 280
+        assert!(is_out_of_bounds(Vec3::new(300.0, 0.0, 0.0), radius, &config)); // Outside X
+        assert!(is_out_of_bounds(Vec3::new(0.0, 400.0, 0.0), radius, &config)); // Outside Y
+        assert!(is_out_of_bounds(
+            Vec3::new(-250.0, 0.0, 0.0),
+            radius,
+            &config
+        )); // Outside -X
+        assert!(is_out_of_bounds(
+            Vec3::new(0.0, -350.0, 0.0),
+            radius,
+            &config
+        )); // Outside -Y
+
+        // Test edge cases - fruit partially outside
+        assert!(is_out_of_bounds(Vec3::new(185.0, 0.0, 0.0), radius, &config)); // Center at 185, edge at 205 > 200
+        assert!(!is_out_of_bounds(
+            Vec3::new(175.0, 0.0, 0.0),
+            radius,
+            &config
+        )); // Center at 175, edge at 195 < 200
     }
 }

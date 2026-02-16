@@ -79,23 +79,39 @@ impl FruitType {
     /// This method reads parameters from the externalized RON configuration,
     /// allowing hot-reload of fruit parameters during gameplay.
     ///
-    /// # Panics
-    ///
-    /// Panics if the fruit config doesn't contain data for this fruit type.
-    pub fn parameters_from_config(&self, config: &FruitsConfig) -> FruitParams {
+    /// Returns `None` if the config doesn't contain an entry for this fruit type.
+    /// This can happen during hot-reload if the RON file is temporarily invalid.
+    pub fn try_parameters_from_config(&self, config: &FruitsConfig) -> Option<FruitParams> {
         let index = *self as usize;
-        let entry = &config.fruits[index];
+        let entry = config.fruits.get(index)?;
 
         // Calculate mass from radius and mass_multiplier
         let mass = entry.radius * entry.radius * entry.mass_multiplier;
 
-        FruitParams {
+        Some(FruitParams {
             radius: entry.radius,
             mass,
             restitution: entry.restitution,
             friction: entry.friction,
             points: entry.points,
-        }
+        })
+    }
+
+    /// Returns the physical and game parameters for this fruit type from RON config
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fruit config doesn't contain data for this fruit type.
+    /// Use `try_parameters_from_config` for graceful error handling during hot-reload.
+    pub fn parameters_from_config(&self, config: &FruitsConfig) -> FruitParams {
+        self.try_parameters_from_config(config).unwrap_or_else(|| {
+            panic!(
+                "FruitsConfig missing entry for {:?} (index {}). Expected at least {} entries.",
+                self,
+                *self as usize,
+                (*self as usize) + 1
+            )
+        })
     }
 
     /// Returns the array of fruits that can be spawned by the player

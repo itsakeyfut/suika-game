@@ -76,7 +76,7 @@ pub fn setup_fruit_preview(
         NextFruitPreview,
         Sprite {
             color: next_fruit.get().placeholder_color(),
-            custom_size: Some(Vec2::splat(radius * preview_scale)),
+            custom_size: Some(Vec2::splat(radius * 2.0 * preview_scale)),
             ..default()
         },
         Transform::from_xyz(preview_x, preview_y, 10.0),
@@ -150,7 +150,7 @@ pub fn update_fruit_preview(
             if let Some(fruits_cfg) = fruits_config {
                 let preview_scale = game_rules.map(|r| r.preview_scale).unwrap_or(1.5);
                 let params = next_fruit.get().parameters_from_config(fruits_cfg);
-                sprite.custom_size = Some(Vec2::splat(params.radius * preview_scale));
+                sprite.custom_size = Some(Vec2::splat(params.radius * 2.0 * preview_scale));
             }
         }
     }

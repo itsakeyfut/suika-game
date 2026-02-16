@@ -54,6 +54,7 @@ pub fn setup_container(
     // Left wall
     commands.spawn((
         Container,
+        LeftWall, // Marker for hot-reload wall identification
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
         Friction::coefficient(wall_friction),
@@ -73,6 +74,7 @@ pub fn setup_container(
     // Right wall
     commands.spawn((
         Container,
+        RightWall, // Marker for hot-reload wall identification
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
         Friction::coefficient(wall_friction),
