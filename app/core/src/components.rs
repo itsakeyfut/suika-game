@@ -52,6 +52,14 @@ pub struct Fruit;
 #[derive(Component, Debug, Clone, Copy, Default)]
 pub struct Container;
 
+/// Bottom wall marker component
+///
+/// Marks the bottom wall of the container specifically.
+/// Used to distinguish the ground from side walls for fruit landing detection.
+/// When a falling fruit collides with this, it's considered "landed".
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct BottomWall;
+
 /// Boundary line marker component
 ///
 /// Marks the entity representing the game over boundary line.

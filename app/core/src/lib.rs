@@ -55,7 +55,8 @@ pub mod prelude {
 
     // Components
     pub use crate::components::{
-        BoundaryLine, Container, Dropping, Fruit, FruitSpawnState, MergeCandidate, NextFruitPreview,
+        BottomWall, BoundaryLine, Container, Dropping, Fruit, FruitSpawnState, MergeCandidate,
+        NextFruitPreview,
     };
 
     // Fruit system
@@ -63,6 +64,7 @@ pub mod prelude {
 
     // Resources
     pub use crate::resources::{ComboTimer, GameOverTimer, GameState, NextFruitType};
+    pub use crate::systems::input::{InputMode, LastCursorPosition, SpawnPosition};
 
     // States
     pub use crate::states::AppState;
