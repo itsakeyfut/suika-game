@@ -161,11 +161,11 @@ pub fn spawn_held_fruit(
 ///
 /// # System Parameters
 ///
-/// - `collision_events`: Rapier collision event reader
+/// - `collision_events`: Rapier collision message reader
 /// - `fruit_query`: Query for fruits and their spawn state
 /// - `bottom_wall_query`: Query for bottom wall entity (ground)
 pub fn detect_fruit_landing(
-    mut collision_events: EventReader<CollisionEvent>,
+    mut collision_events: MessageReader<CollisionEvent>,
     mut fruit_query: Query<&mut FruitSpawnState, With<Fruit>>,
     bottom_wall_query: Query<Entity, With<BottomWall>>,
 ) {
