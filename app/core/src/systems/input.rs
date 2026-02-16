@@ -80,28 +80,15 @@ pub fn spawn_held_fruit(
     spawn_pos: Res<SpawnPosition>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
 ) {
-    // Check if there's a held or falling fruit
-    let has_held_fruit = fruit_states
-        .iter()
-        .any(|state| *state == FruitSpawnState::Held);
-
-    let has_falling_fruit = fruit_states
-        .iter()
-        .any(|state| *state == FruitSpawnState::Falling);
-
-    // Debug: Count fruits by state
-    let held_count = fruit_states
-        .iter()
-        .filter(|s| **s == FruitSpawnState::Held)
-        .count();
-    let falling_count = fruit_states
-        .iter()
-        .filter(|s| **s == FruitSpawnState::Falling)
-        .count();
-    let landed_count = fruit_states
-        .iter()
-        .filter(|s| **s == FruitSpawnState::Landed)
-        .count();
+    // Count fruits by state in a single iteration
+    let (held_count, falling_count, landed_count) =
+        fruit_states
+            .iter()
+            .fold((0u32, 0u32, 0u32), |(h, f, l), state| match *state {
+                FruitSpawnState::Held => (h + 1, f, l),
+                FruitSpawnState::Falling => (h, f + 1, l),
+                FruitSpawnState::Landed => (h, f, l + 1),
+            });
 
     if held_count > 0 || falling_count > 0 || landed_count > 0 {
         trace!(
@@ -113,7 +100,7 @@ pub fn spawn_held_fruit(
     // Only spawn if:
     // 1. No fruit in Held state
     // 2. No fruit in Falling state (wait for it to land first)
-    if !has_held_fruit && !has_falling_fruit {
+    if held_count == 0 && falling_count == 0 {
         let spawn_y = physics::CONTAINER_HEIGHT / 2.0 - 50.0;
         let params = next_fruit.get().parameters();
 
