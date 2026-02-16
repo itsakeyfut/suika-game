@@ -10,6 +10,9 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_rapier2d::prelude::*;
 
+#[cfg(test)]
+use bevy_rapier2d::rapier::geometry::CollisionEventFlags;
+
 use crate::components::{BottomWall, Fruit, FruitSpawnState};
 use crate::constants::physics;
 use crate::fruit::FruitType;
@@ -29,6 +32,24 @@ pub struct SpawnPosition {
 impl Default for SpawnPosition {
     fn default() -> Self {
         Self { x: 0.0 }
+    }
+}
+
+/// Input mode for controlling fruit position
+///
+/// Tracks whether the player is currently using keyboard or mouse input.
+/// The mode automatically switches based on which input device was used most recently.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputMode {
+    /// Player is using keyboard (arrow keys or A/D)
+    Keyboard,
+    /// Player is using mouse cursor
+    Mouse,
+}
+
+impl Default for InputMode {
+    fn default() -> Self {
+        Self::Mouse // Default to mouse mode
     }
 }
 
@@ -61,9 +82,18 @@ pub fn spawn_held_fruit(
         .any(|state| *state == FruitSpawnState::Falling);
 
     // Debug: Count fruits by state
-    let held_count = fruit_states.iter().filter(|s| **s == FruitSpawnState::Held).count();
-    let falling_count = fruit_states.iter().filter(|s| **s == FruitSpawnState::Falling).count();
-    let landed_count = fruit_states.iter().filter(|s| **s == FruitSpawnState::Landed).count();
+    let held_count = fruit_states
+        .iter()
+        .filter(|s| **s == FruitSpawnState::Held)
+        .count();
+    let falling_count = fruit_states
+        .iter()
+        .filter(|s| **s == FruitSpawnState::Falling)
+        .count();
+    let landed_count = fruit_states
+        .iter()
+        .filter(|s| **s == FruitSpawnState::Landed)
+        .count();
 
     if held_count > 0 || falling_count > 0 || landed_count > 0 {
         info!(
@@ -227,6 +257,10 @@ pub fn handle_fruit_drop_input(
 /// 1. Arrow keys: Left/Right (←→) or A/D keys move horizontally
 /// 2. Mouse cursor: Position follows the mouse X coordinate
 ///
+/// The input mode automatically switches based on which input device was used most recently:
+/// - Pressing arrow/AD keys switches to keyboard mode
+/// - Moving the mouse cursor switches to mouse mode
+///
 /// Only fruits in the Held state are moved. Falling and Landed fruits are not affected.
 /// The final position is clamped to stay within container boundaries.
 ///
@@ -236,6 +270,7 @@ pub fn handle_fruit_drop_input(
 /// - `windows`: Query for the primary window (to get cursor position)
 /// - `camera_query`: Query for camera and its transform (for world position conversion)
 /// - `spawn_pos`: Mutable spawn position resource to update
+/// - `input_mode`: Current input mode (keyboard or mouse)
 /// - `held_fruits`: Query for held fruits to move (only Held state)
 /// - `time`: Time resource for delta time (smooth movement with keys)
 pub fn update_spawn_position(
@@ -243,25 +278,49 @@ pub fn update_spawn_position(
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut spawn_pos: ResMut<SpawnPosition>,
+    mut input_mode: ResMut<InputMode>,
     mut held_fruits: Query<(&mut Transform, &FruitSpawnState, &FruitType), With<Fruit>>,
     time: Res<Time>,
 ) {
-    // Handle keyboard movement (Arrow keys or A/D keys)
-    const MOVE_SPEED: f32 = 300.0; // pixels per second
-    if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
-        spawn_pos.x -= MOVE_SPEED * time.delta_secs();
-    }
-    if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) {
-        spawn_pos.x += MOVE_SPEED * time.delta_secs();
+    // Check for keyboard input and switch mode if detected
+    let keyboard_input = keyboard.pressed(KeyCode::ArrowLeft)
+        || keyboard.pressed(KeyCode::KeyA)
+        || keyboard.pressed(KeyCode::ArrowRight)
+        || keyboard.pressed(KeyCode::KeyD);
+
+    if keyboard_input {
+        *input_mode = InputMode::Keyboard;
     }
 
-    // Handle mouse cursor position
+    // Handle keyboard movement (only in keyboard mode)
+    if *input_mode == InputMode::Keyboard {
+        const MOVE_SPEED: f32 = 300.0; // pixels per second
+        if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
+            spawn_pos.x -= MOVE_SPEED * time.delta_secs();
+        }
+        if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) {
+            spawn_pos.x += MOVE_SPEED * time.delta_secs();
+        }
+    }
+
+    // Check for mouse movement and switch mode if detected
     if let Ok(window) = windows.single() {
         if let Some(cursor_pos) = window.cursor_position() {
             if let Ok((camera, camera_transform)) = camera_query.single() {
                 // Convert viewport coordinates to world coordinates
                 if let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) {
-                    spawn_pos.x = world_pos.x;
+                    // Only update if mouse has moved (switch to mouse mode)
+                    // We detect movement by comparing current world_pos with spawn_pos
+                    // If they're different, assume mouse moved
+                    const MOUSE_MOVEMENT_THRESHOLD: f32 = 1.0; // pixels
+                    if (world_pos.x - spawn_pos.x).abs() > MOUSE_MOVEMENT_THRESHOLD {
+                        *input_mode = InputMode::Mouse;
+                    }
+
+                    // Handle mouse cursor position (only in mouse mode)
+                    if *input_mode == InputMode::Mouse {
+                        spawn_pos.x = world_pos.x;
+                    }
                 }
             }
         }
@@ -300,7 +359,8 @@ mod tests {
 
     #[test]
     fn test_spawn_position_clamp() {
-        let max_x = physics::CONTAINER_WIDTH / 2.0 - 40.0;
+        // Use default fruit radius (20.0) to match system behavior
+        let max_x = physics::CONTAINER_WIDTH / 2.0 - 20.0;
 
         // Test clamping
         let mut pos = SpawnPosition { x: 1000.0 };
@@ -327,7 +387,7 @@ mod tests {
 
         // Initial fruit count
         let initial_count = app
-            .world()
+            .world_mut()
             .query_filtered::<Entity, With<Fruit>>()
             .iter(app.world())
             .count();
@@ -336,12 +396,16 @@ mod tests {
 
         // Should have spawned one held fruit
         let final_count = app
-            .world()
+            .world_mut()
             .query_filtered::<Entity, With<Fruit>>()
             .iter(app.world())
             .count();
 
-        assert_eq!(final_count, initial_count + 1, "Should spawn one held fruit");
+        assert_eq!(
+            final_count,
+            initial_count + 1,
+            "Should spawn one held fruit"
+        );
     }
 
     #[test]
@@ -354,14 +418,14 @@ mod tests {
 
         app.update();
         let count_after_first = app
-            .world()
+            .world_mut()
             .query_filtered::<Entity, With<Fruit>>()
             .iter(app.world())
             .count();
 
         app.update();
         let count_after_second = app
-            .world()
+            .world_mut()
             .query_filtered::<Entity, With<Fruit>>()
             .iter(app.world())
             .count();
@@ -392,7 +456,7 @@ mod tests {
 
         // Should NOT spawn a new held fruit while one is falling
         let held_count = app
-            .world()
+            .world_mut()
             .query_filtered::<&FruitSpawnState, With<Fruit>>()
             .iter(app.world())
             .filter(|s| **s == FruitSpawnState::Held)
@@ -410,6 +474,8 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<ButtonInput<MouseButton>>();
         app.add_systems(Update, (spawn_held_fruit, handle_fruit_drop_input));
 
         // Spawn a held fruit first
@@ -424,7 +490,7 @@ mod tests {
 
         // Verify fruit transitioned to Falling state
         let falling_count = app
-            .world()
+            .world_mut()
             .query_filtered::<&FruitSpawnState, With<Fruit>>()
             .iter(app.world())
             .filter(|state| **state == FruitSpawnState::Falling)
@@ -439,6 +505,8 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<ButtonInput<MouseButton>>();
         app.add_systems(Update, (spawn_held_fruit, handle_fruit_drop_input));
 
         app.update();
@@ -451,7 +519,7 @@ mod tests {
         app.update();
 
         let falling_count = app
-            .world()
+            .world_mut()
             .query_filtered::<&FruitSpawnState, With<Fruit>>()
             .iter(app.world())
             .filter(|state| **state == FruitSpawnState::Falling)
@@ -465,6 +533,8 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.insert_resource(SpawnPosition { x: 0.0 });
+        app.init_resource::<InputMode>();
+        app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, update_spawn_position);
 
         // Simulate arrow right press
@@ -472,6 +542,8 @@ mod tests {
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::ArrowRight);
 
+        // Run update twice to ensure non-zero delta time
+        app.update();
         app.update();
 
         let pos = app.world().resource::<SpawnPosition>();
@@ -483,6 +555,8 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.insert_resource(SpawnPosition { x: 0.0 });
+        app.init_resource::<InputMode>();
+        app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, update_spawn_position);
 
         // Simulate D key press
@@ -490,6 +564,8 @@ mod tests {
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::KeyD);
 
+        // Run update twice to ensure non-zero delta time
+        app.update();
         app.update();
 
         let pos = app.world().resource::<SpawnPosition>();
@@ -503,12 +579,15 @@ mod tests {
 
         // Start at extreme position
         app.insert_resource(SpawnPosition { x: 10000.0 });
+        app.init_resource::<InputMode>();
+        app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, update_spawn_position);
 
         app.update();
 
         let pos = app.world().resource::<SpawnPosition>();
-        let max_x = physics::CONTAINER_WIDTH / 2.0 - 40.0;
+        // Use default fruit radius (20.0) to match system behavior
+        let max_x = physics::CONTAINER_WIDTH / 2.0 - 20.0;
 
         assert!(
             pos.x <= max_x,
@@ -525,20 +604,22 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
+        app.init_resource::<InputMode>();
         app.init_resource::<NextFruitType>();
+        app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, (spawn_held_fruit, update_spawn_position));
 
         // Spawn held fruit
         app.update();
 
-        // Move spawn position
+        // Move spawn position manually (simulating external input)
         app.world_mut().resource_mut::<SpawnPosition>().x = 100.0;
 
         app.update();
 
         // Verify held fruit moved
         let fruit_x = app
-            .world()
+            .world_mut()
             .query_filtered::<(&Transform, &FruitSpawnState), With<Fruit>>()
             .iter(app.world())
             .filter(|(_, state)| **state == FruitSpawnState::Held)
@@ -556,7 +637,7 @@ mod tests {
     fn test_detect_fruit_landing_transitions_to_landed() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
-        app.add_event::<CollisionEvent>();
+        app.add_message::<CollisionEvent>();
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
         app.add_systems(Update, detect_fruit_landing);
@@ -575,13 +656,12 @@ mod tests {
         // Spawn a bottom wall (ground)
         let bottom_wall = app.world_mut().spawn(BottomWall).id();
 
-        // Simulate collision event
-        app.world_mut()
-            .send_event(CollisionEvent::Started(
-                fruit,
-                bottom_wall,
-                CollisionEventFlags::empty(),
-            ));
+        // Simulate collision event (bevy_rapier2d 0.32 API)
+        app.world_mut().write_message(CollisionEvent::Started(
+            fruit,
+            bottom_wall,
+            CollisionEventFlags::empty(),
+        ));
 
         app.update();
 
@@ -598,7 +678,7 @@ mod tests {
     fn test_spawn_held_fruit_after_landing() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
-        app.add_event::<CollisionEvent>();
+        app.add_message::<CollisionEvent>();
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
         app.add_systems(Update, (detect_fruit_landing, spawn_held_fruit));
@@ -606,16 +686,9 @@ mod tests {
         // Spawn initial held fruit
         app.update();
 
-        let initial_count = app
-            .world()
-            .query_filtered::<&FruitSpawnState, With<Fruit>>()
-            .iter(app.world())
-            .filter(|s| **s == FruitSpawnState::Held)
-            .count();
-
         // Manually transition to falling then landed
         let fruit_entity = app
-            .world()
+            .world_mut()
             .query_filtered::<Entity, With<Fruit>>()
             .iter(app.world())
             .next()
@@ -629,16 +702,30 @@ mod tests {
 
         // Should spawn a new held fruit
         let final_count = app
-            .world()
+            .world_mut()
             .query_filtered::<&FruitSpawnState, With<Fruit>>()
             .iter(app.world())
             .filter(|s| **s == FruitSpawnState::Held)
             .count();
 
+        // After landing, a new held fruit should be spawned (replacing behavior)
+        // initial_count was 1 (the first held fruit)
+        // After setting it to Landed and updating, a new Held fruit spawns
+        // So final_count should still be 1 (one Held fruit exists)
         assert_eq!(
-            final_count,
-            initial_count + 1,
-            "Should spawn new held fruit after previous one lands"
+            final_count, 1,
+            "Should have one held fruit after previous one lands"
+        );
+
+        // Verify total fruit count increased (landed + new held = 2 total)
+        let total_fruit_count = app
+            .world_mut()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+        assert_eq!(
+            total_fruit_count, 2,
+            "Should have 2 total fruits (1 landed + 1 new held)"
         );
     }
 
@@ -647,10 +734,17 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
+        app.init_resource::<InputMode>();
         app.init_resource::<NextFruitType>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<ButtonInput<MouseButton>>();
         app.add_systems(
             Update,
-            (spawn_held_fruit, handle_fruit_drop_input, update_spawn_position),
+            (
+                spawn_held_fruit,
+                handle_fruit_drop_input,
+                update_spawn_position,
+            ),
         );
 
         // Spawn and drop a fruit
@@ -662,7 +756,7 @@ mod tests {
 
         // Get falling fruit position
         let initial_x = app
-            .world()
+            .world_mut()
             .query_filtered::<(&Transform, &FruitSpawnState), With<Fruit>>()
             .iter(app.world())
             .filter(|(_, state)| **state == FruitSpawnState::Falling)
@@ -675,7 +769,7 @@ mod tests {
 
         // Verify falling fruit did NOT move
         let final_x = app
-            .world()
+            .world_mut()
             .query_filtered::<(&Transform, &FruitSpawnState), With<Fruit>>()
             .iter(app.world())
             .filter(|(_, state)| **state == FruitSpawnState::Falling)

@@ -42,6 +42,7 @@ fn main() {
         .init_resource::<GameOverTimer>()
         .init_resource::<NextFruitType>()
         .init_resource::<SpawnPosition>()
+        .init_resource::<InputMode>()
         // Game plugins (internal crates)
         .add_plugins(GameAssetsPlugin) // Load assets first
         .add_plugins(GameCorePlugin)
