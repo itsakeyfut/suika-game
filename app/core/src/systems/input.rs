@@ -97,6 +97,8 @@ pub fn spawn_held_fruit(
             Collider::ball(params.radius),
             // Enable collision events (required for Rapier)
             ActiveEvents::COLLISION_EVENTS,
+            // Disable sleeping to allow continuous physics interactions
+            Sleeping::disabled(),
         ));
 
         info!("Spawned held fruit: {:?}", next_fruit.get());
@@ -205,7 +207,7 @@ pub fn handle_fruit_drop_input(
                     ColliderMassProperties::Mass(params.mass),
                     Damping {
                         linear_damping: 0.5,
-                        angular_damping: 1.0,
+                        angular_damping: 0.1,
                     },
                     GravityScale(1.0),
                 ));
