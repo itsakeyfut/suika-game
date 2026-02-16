@@ -3,8 +3,8 @@
 //! This module provides debug visualization features for development,
 //! including a GUI inspector window powered by bevy-inspector-egui.
 //!
-//! Debug features are only enabled in debug builds and are automatically
-//! stripped from release builds.
+//! Debug features are only enabled when the `dev-tools` feature is active
+//! (typically in debug builds) and are automatically stripped from release builds.
 
 use bevy::prelude::*;
 
@@ -15,16 +15,16 @@ use bevy::prelude::*;
 /// - Physics collider visualization (Rapier debug renderer)
 /// - Resource and component inspection
 ///
-/// # Debug Builds Only
+/// # Feature Gating
 ///
 /// All debug features are conditionally compiled and only available
-/// in debug builds (`#[cfg(debug_assertions)]`). They are completely
+/// when the `dev-tools` feature is enabled. They are completely
 /// removed from release builds.
 ///
 /// # Controls
 ///
 /// The inspector window can be used to:
-/// - Toggle physics collider rendering
+/// - Toggle physics collider rendering via DebugRenderContext
 /// - Inspect entities and their components
 /// - Modify resource values at runtime
 /// - View game state in real-time
@@ -32,7 +32,7 @@ pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, feature = "dev-tools"))]
         {
             use bevy_inspector_egui::bevy_egui::EguiPlugin;
             use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -50,10 +50,14 @@ impl Plugin for DebugPlugin {
             app.add_plugins(WorldInspectorPlugin::new());
         }
 
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(all(debug_assertions, feature = "dev-tools")))]
         {
-            // In release builds, this plugin does nothing
+            // In release builds or without dev-tools feature, this plugin does nothing
+            #[cfg(not(debug_assertions))]
             info!("Release mode - debug rendering disabled");
+
+            #[cfg(all(debug_assertions, not(feature = "dev-tools")))]
+            info!("Debug mode without dev-tools feature - debug rendering disabled");
         }
     }
 }
@@ -63,36 +67,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_debug_plugin_builds() {
+    fn test_debug_plugin_can_be_constructed() {
         // Test that the plugin can be constructed
-        let plugin = DebugPlugin;
-
-        // Verify the plugin type is correct
-        assert_eq!(
-            std::any::type_name::<DebugPlugin>(),
-            std::any::type_name_of_val(&plugin)
-        );
+        let _plugin = DebugPlugin;
+        // If we get here without panicking, the test passes
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(not(feature = "dev-tools"))]
     #[test]
-    fn test_debug_mode_enabled() {
-        // In debug builds, debug assertions should be enabled
-        let debug_enabled = cfg!(debug_assertions);
-        assert!(
-            debug_enabled,
-            "Debug mode should be enabled in debug builds"
-        );
+    fn test_debug_plugin_integrates_with_minimal_app() {
+        // When dev-tools is disabled, DebugPlugin should work with MinimalPlugins
+        // (it does nothing in this case, but shouldn't panic)
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(DebugPlugin);
+
+        // The plugin should build without errors
+        app.update();
     }
 
-    #[cfg(not(debug_assertions))]
+    #[cfg(all(debug_assertions, feature = "dev-tools"))]
     #[test]
-    fn test_debug_mode_disabled() {
-        // In release builds, debug assertions should be disabled
-        let debug_enabled = cfg!(debug_assertions);
+    fn test_debug_plugin_requires_full_bevy_setup() {
+        // When dev-tools is enabled, DebugPlugin adds EguiPlugin which requires
+        // full Bevy graphics setup (not available in test environment with MinimalPlugins).
+        // This test just documents that limitation - we can't test the full integration
+        // without DefaultPlugins and a rendering context.
+
+        // We can at least verify the plugin type exists
+        let _plugin = DebugPlugin;
+
+        // Integration testing with dev-tools enabled would require:
+        // - DefaultPlugins
+        // - Proper graphics context
+        // - Window system
+        // These are not available in unit test environment
+    }
+
+    #[cfg(all(debug_assertions, feature = "dev-tools"))]
+    #[test]
+    fn test_dev_tools_feature_enabled() {
+        // When dev-tools feature is enabled in debug mode,
+        // verify that we can import the inspector components
+        use bevy_inspector_egui::quick::WorldInspectorPlugin;
+
+        let _plugin = WorldInspectorPlugin::new();
+        // If we get here, the feature is properly enabled
+    }
+
+    #[cfg(not(feature = "dev-tools"))]
+    #[test]
+    fn test_dev_tools_feature_disabled() {
+        // When dev-tools feature is disabled, the inspector should not be compiled
+        // This test just verifies the feature flag works
         assert!(
-            !debug_enabled,
-            "Debug mode should be disabled in release builds"
+            !cfg!(feature = "dev-tools"),
+            "dev-tools feature should be disabled in this test configuration"
         );
     }
 }
