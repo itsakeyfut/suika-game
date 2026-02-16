@@ -34,6 +34,7 @@ impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
         #[cfg(debug_assertions)]
         {
+            use bevy_inspector_egui::bevy_egui::EguiPlugin;
             use bevy_inspector_egui::quick::WorldInspectorPlugin;
             use bevy_rapier2d::render::RapierDebugRenderPlugin;
 
@@ -41,6 +42,9 @@ impl Plugin for DebugPlugin {
 
             // Add Rapier debug renderer
             app.add_plugins(RapierDebugRenderPlugin::default());
+
+            // Add egui plugin first (required by WorldInspectorPlugin)
+            app.add_plugins(EguiPlugin::default());
 
             // Add inspector GUI
             app.add_plugins(WorldInspectorPlugin::new());
