@@ -55,7 +55,8 @@ pub mod prelude {
 
     // Components
     pub use crate::components::{
-        BoundaryLine, Container, Dropping, Fruit, FruitSpawnState, MergeCandidate, NextFruitPreview,
+        BottomWall, BoundaryLine, Container, Dropping, Fruit, FruitSpawnState, MergeCandidate,
+        NextFruitPreview,
     };
 
     // Fruit system

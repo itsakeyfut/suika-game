@@ -44,6 +44,7 @@ pub fn setup_container(mut commands: Commands) {
         Collider::cuboid(wall_thickness / 2.0, half_height),
         Friction::coefficient(0.5),
         Restitution::coefficient(0.3),
+        ActiveEvents::COLLISION_EVENTS,
         Transform::from_xyz(-half_width - wall_thickness / 2.0, 0.0, 0.0),
         Sprite {
             color: Color::srgb(0.5, 0.5, 0.5),
@@ -59,6 +60,7 @@ pub fn setup_container(mut commands: Commands) {
         Collider::cuboid(wall_thickness / 2.0, half_height),
         Friction::coefficient(0.5),
         Restitution::coefficient(0.3),
+        ActiveEvents::COLLISION_EVENTS,
         Transform::from_xyz(half_width + wall_thickness / 2.0, 0.0, 0.0),
         Sprite {
             color: Color::srgb(0.5, 0.5, 0.5),
@@ -70,10 +72,12 @@ pub fn setup_container(mut commands: Commands) {
     // Bottom wall
     commands.spawn((
         Container,
+        BottomWall, // Marker for landing detection
         RigidBody::Fixed,
         Collider::cuboid(half_width + wall_thickness, wall_thickness / 2.0),
         Friction::coefficient(0.5),
         Restitution::coefficient(0.3),
+        ActiveEvents::COLLISION_EVENTS,
         Transform::from_xyz(0.0, -half_height - wall_thickness / 2.0, 0.0),
         Sprite {
             color: Color::srgb(0.5, 0.5, 0.5),

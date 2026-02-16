@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_rapier2d::prelude::*;
 
-use crate::components::{Fruit, FruitSpawnState};
+use crate::components::{BottomWall, Fruit, FruitSpawnState};
 use crate::constants::physics;
 use crate::fruit::FruitType;
 use crate::resources::NextFruitType;
@@ -34,23 +34,48 @@ impl Default for SpawnPosition {
 
 /// Spawns a new held fruit if none exists
 ///
-/// This system runs once at startup and after each fruit is dropped.
+/// This system runs once at startup and after each fruit lands.
 /// It creates a fruit in the Held state that hovers at the top of the container.
+///
+/// **Important**: Will NOT spawn if there's a falling fruit (waiting for it to land first).
 ///
 /// # System Parameters
 ///
 /// - `commands`: For spawning new fruit entities
 /// - `next_fruit`: The type of fruit to spawn
 /// - `spawn_pos`: Current spawn position (X coordinate)
-/// - `held_fruits`: Query to check if a held fruit already exists
+/// - `fruit_states`: Query to check fruit spawn states
 pub fn spawn_held_fruit(
     mut commands: Commands,
     next_fruit: Res<NextFruitType>,
     spawn_pos: Res<SpawnPosition>,
-    held_fruits: Query<Entity, (With<Fruit>, With<FruitSpawnState>)>,
+    fruit_states: Query<&FruitSpawnState, With<Fruit>>,
 ) {
-    // Only spawn if there's no held fruit
-    if held_fruits.is_empty() {
+    // Check if there's a held or falling fruit
+    let has_held_fruit = fruit_states
+        .iter()
+        .any(|state| *state == FruitSpawnState::Held);
+
+    let has_falling_fruit = fruit_states
+        .iter()
+        .any(|state| *state == FruitSpawnState::Falling);
+
+    // Debug: Count fruits by state
+    let held_count = fruit_states.iter().filter(|s| **s == FruitSpawnState::Held).count();
+    let falling_count = fruit_states.iter().filter(|s| **s == FruitSpawnState::Falling).count();
+    let landed_count = fruit_states.iter().filter(|s| **s == FruitSpawnState::Landed).count();
+
+    if held_count > 0 || falling_count > 0 || landed_count > 0 {
+        info!(
+            "Fruit states - Held: {}, Falling: {}, Landed: {}",
+            held_count, falling_count, landed_count
+        );
+    }
+
+    // Only spawn if:
+    // 1. No fruit in Held state
+    // 2. No fruit in Falling state (wait for it to land first)
+    if !has_held_fruit && !has_falling_fruit {
         let spawn_y = physics::CONTAINER_HEIGHT / 2.0 - 50.0;
         let params = next_fruit.get().parameters();
 
@@ -70,9 +95,71 @@ pub fn spawn_held_fruit(
             RigidBody::KinematicPositionBased,
             // Collision shape (for preview, not for physics yet)
             Collider::ball(params.radius),
+            // Enable collision events (required for Rapier)
+            ActiveEvents::COLLISION_EVENTS,
         ));
 
         info!("Spawned held fruit: {:?}", next_fruit.get());
+    }
+}
+
+/// Detects when falling fruits land (collide with ground or other fruits)
+///
+/// Monitors collision events and transitions falling fruits to Landed state
+/// when they collide with the bottom wall (ground) or other fruits.
+/// Side walls are ignored - only ground collisions count as landing.
+/// This triggers the spawning of the next fruit.
+///
+/// # System Parameters
+///
+/// - `collision_events`: Rapier collision event reader
+/// - `fruit_query`: Query for fruits and their spawn state
+/// - `bottom_wall_query`: Query for bottom wall entity (ground)
+pub fn detect_fruit_landing(
+    mut collision_events: EventReader<CollisionEvent>,
+    mut fruit_query: Query<&mut FruitSpawnState, With<Fruit>>,
+    bottom_wall_query: Query<Entity, With<BottomWall>>,
+) {
+    for event in collision_events.read() {
+        if let CollisionEvent::Started(entity1, entity2, _) = event {
+            // Collect entities to update (to avoid borrow checker issues)
+            let mut entities_to_land = Vec::new();
+
+            // Check if entity1 is a falling fruit
+            if let Ok(spawn_state) = fruit_query.get(*entity1) {
+                if *spawn_state == FruitSpawnState::Falling {
+                    let hit_bottom_wall = bottom_wall_query.contains(*entity2);
+                    let hit_fruit = fruit_query.contains(*entity2);
+
+                    if hit_bottom_wall || hit_fruit {
+                        entities_to_land.push((*entity1, hit_bottom_wall));
+                    }
+                }
+            }
+
+            // Check if entity2 is a falling fruit
+            if let Ok(spawn_state) = fruit_query.get(*entity2) {
+                if *spawn_state == FruitSpawnState::Falling {
+                    let hit_bottom_wall = bottom_wall_query.contains(*entity1);
+                    let hit_fruit = fruit_query.contains(*entity1);
+
+                    if hit_bottom_wall || hit_fruit {
+                        entities_to_land.push((*entity2, hit_bottom_wall));
+                    }
+                }
+            }
+
+            // Now update the states
+            for (entity, hit_bottom_wall) in entities_to_land {
+                if let Ok(mut spawn_state) = fruit_query.get_mut(entity) {
+                    *spawn_state = FruitSpawnState::Landed;
+                    info!(
+                        "Fruit landed (collided with {})",
+                        if hit_bottom_wall { "ground" } else { "fruit" }
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -136,7 +223,7 @@ pub fn handle_fruit_drop_input(
 /// 1. Arrow keys: Left/Right (←→) or A/D keys move horizontally
 /// 2. Mouse cursor: Position follows the mouse X coordinate
 ///
-/// The held fruit (if any) is moved to match the spawn position in real-time.
+/// Only fruits in the Held state are moved. Falling and Landed fruits are not affected.
 /// The final position is clamped to stay within container boundaries.
 ///
 /// # System Parameters
@@ -145,14 +232,14 @@ pub fn handle_fruit_drop_input(
 /// - `windows`: Query for the primary window (to get cursor position)
 /// - `camera_query`: Query for camera and its transform (for world position conversion)
 /// - `spawn_pos`: Mutable spawn position resource to update
-/// - `held_fruits`: Query for held fruits to move
+/// - `held_fruits`: Query for held fruits to move (only Held state)
 /// - `time`: Time resource for delta time (smooth movement with keys)
 pub fn update_spawn_position(
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut spawn_pos: ResMut<SpawnPosition>,
-    mut held_fruits: Query<&mut Transform, (With<Fruit>, With<FruitSpawnState>)>,
+    mut held_fruits: Query<(&mut Transform, &FruitSpawnState), With<Fruit>>,
     time: Res<Time>,
 ) {
     // Handle keyboard movement (Arrow keys or A/D keys)
@@ -181,9 +268,12 @@ pub fn update_spawn_position(
     let max_x = physics::CONTAINER_WIDTH / 2.0 - 40.0;
     spawn_pos.x = spawn_pos.x.clamp(-max_x, max_x);
 
-    // Update held fruit position to match spawn position
-    for mut transform in held_fruits.iter_mut() {
-        transform.translation.x = spawn_pos.x;
+    // Update ONLY held fruit position to match spawn position
+    // Falling and Landed fruits are not affected
+    for (mut transform, spawn_state) in held_fruits.iter_mut() {
+        if *spawn_state == FruitSpawnState::Held {
+            transform.translation.x = spawn_pos.x;
+        }
     }
 }
 
@@ -268,6 +358,38 @@ mod tests {
         assert_eq!(
             count_after_first, count_after_second,
             "Should not spawn multiple held fruits"
+        );
+    }
+
+    #[test]
+    fn test_spawn_held_fruit_waits_for_falling_fruit() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(Update, spawn_held_fruit);
+
+        // Manually spawn a falling fruit
+        app.world_mut().spawn((
+            Fruit,
+            FruitType::Cherry,
+            FruitSpawnState::Falling,
+            Transform::default(),
+        ));
+
+        app.update();
+
+        // Should NOT spawn a new held fruit while one is falling
+        let held_count = app
+            .world()
+            .query_filtered::<&FruitSpawnState, With<Fruit>>()
+            .iter(app.world())
+            .filter(|s| **s == FruitSpawnState::Held)
+            .count();
+
+        assert_eq!(
+            held_count, 0,
+            "Should not spawn held fruit while another is falling"
         );
     }
 
@@ -406,11 +528,152 @@ mod tests {
         // Verify held fruit moved
         let fruit_x = app
             .world()
-            .query_filtered::<&Transform, (With<Fruit>, With<FruitSpawnState>)>()
+            .query_filtered::<(&Transform, &FruitSpawnState), With<Fruit>>()
+            .iter(app.world())
+            .filter(|(_, state)| **state == FruitSpawnState::Held)
+            .next()
+            .map(|(t, _)| t.translation.x);
+
+        assert_eq!(
+            fruit_x,
+            Some(100.0),
+            "Held fruit should move with spawn position"
+        );
+    }
+
+    #[test]
+    fn test_detect_fruit_landing_transitions_to_landed() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_event::<CollisionEvent>();
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(Update, detect_fruit_landing);
+
+        // Manually spawn a falling fruit
+        let fruit = app
+            .world_mut()
+            .spawn((
+                Fruit,
+                FruitType::Cherry,
+                FruitSpawnState::Falling,
+                Transform::default(),
+            ))
+            .id();
+
+        // Spawn a bottom wall (ground)
+        let bottom_wall = app.world_mut().spawn(BottomWall).id();
+
+        // Simulate collision event
+        app.world_mut()
+            .send_event(CollisionEvent::Started(
+                fruit,
+                bottom_wall,
+                CollisionEventFlags::empty(),
+            ));
+
+        app.update();
+
+        // Verify fruit transitioned to Landed
+        let state = app.world().get::<FruitSpawnState>(fruit).unwrap();
+        assert_eq!(
+            *state,
+            FruitSpawnState::Landed,
+            "Fruit should transition to Landed after collision with ground"
+        );
+    }
+
+    #[test]
+    fn test_spawn_held_fruit_after_landing() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_event::<CollisionEvent>();
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(Update, (detect_fruit_landing, spawn_held_fruit));
+
+        // Spawn initial held fruit
+        app.update();
+
+        let initial_count = app
+            .world()
+            .query_filtered::<&FruitSpawnState, With<Fruit>>()
+            .iter(app.world())
+            .filter(|s| **s == FruitSpawnState::Held)
+            .count();
+
+        // Manually transition to falling then landed
+        let fruit_entity = app
+            .world()
+            .query_filtered::<Entity, With<Fruit>>()
             .iter(app.world())
             .next()
-            .map(|t| t.translation.x);
+            .unwrap();
 
-        assert_eq!(fruit_x, Some(100.0), "Held fruit should move with spawn position");
+        app.world_mut()
+            .entity_mut(fruit_entity)
+            .insert(FruitSpawnState::Landed);
+
+        app.update();
+
+        // Should spawn a new held fruit
+        let final_count = app
+            .world()
+            .query_filtered::<&FruitSpawnState, With<Fruit>>()
+            .iter(app.world())
+            .filter(|s| **s == FruitSpawnState::Held)
+            .count();
+
+        assert_eq!(
+            final_count,
+            initial_count + 1,
+            "Should spawn new held fruit after previous one lands"
+        );
+    }
+
+    #[test]
+    fn test_update_spawn_position_does_not_move_falling_fruit() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(
+            Update,
+            (spawn_held_fruit, handle_fruit_drop_input, update_spawn_position),
+        );
+
+        // Spawn and drop a fruit
+        app.update();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Space);
+        app.update();
+
+        // Get falling fruit position
+        let initial_x = app
+            .world()
+            .query_filtered::<(&Transform, &FruitSpawnState), With<Fruit>>()
+            .iter(app.world())
+            .filter(|(_, state)| **state == FruitSpawnState::Falling)
+            .next()
+            .map(|(t, _)| t.translation.x);
+
+        // Change spawn position
+        app.world_mut().resource_mut::<SpawnPosition>().x = 200.0;
+        app.update();
+
+        // Verify falling fruit did NOT move
+        let final_x = app
+            .world()
+            .query_filtered::<(&Transform, &FruitSpawnState), With<Fruit>>()
+            .iter(app.world())
+            .filter(|(_, state)| **state == FruitSpawnState::Falling)
+            .next()
+            .map(|(t, _)| t.translation.x);
+
+        assert_eq!(
+            initial_x, final_x,
+            "Falling fruit should not move with spawn position"
+        );
     }
 }
