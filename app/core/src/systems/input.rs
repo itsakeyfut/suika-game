@@ -53,6 +53,23 @@ impl Default for InputMode {
     }
 }
 
+/// Tracks the last known cursor position to detect mouse movement
+///
+/// Used to distinguish between actual mouse movement and position changes
+/// caused by keyboard input. Only switches to mouse mode when the cursor
+/// itself moves.
+#[derive(Resource, Debug, Clone)]
+pub struct LastCursorPosition {
+    /// Last known cursor position in world coordinates
+    pub position: Option<Vec2>,
+}
+
+impl Default for LastCursorPosition {
+    fn default() -> Self {
+        Self { position: None }
+    }
+}
+
 /// Spawns a new held fruit if none exists
 ///
 /// This system runs once at startup and after each fruit lands.
@@ -279,6 +296,7 @@ pub fn update_spawn_position(
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut spawn_pos: ResMut<SpawnPosition>,
     mut input_mode: ResMut<InputMode>,
+    mut last_cursor_pos: ResMut<LastCursorPosition>,
     mut held_fruits: Query<(&mut Transform, &FruitSpawnState, &FruitType), With<Fruit>>,
     time: Res<Time>,
 ) {
@@ -309,13 +327,20 @@ pub fn update_spawn_position(
             if let Ok((camera, camera_transform)) = camera_query.single() {
                 // Convert viewport coordinates to world coordinates
                 if let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) {
-                    // Only update if mouse has moved (switch to mouse mode)
-                    // We detect movement by comparing current world_pos with spawn_pos
-                    // If they're different, assume mouse moved
+                    // Detect actual mouse movement by comparing with last cursor position
                     const MOUSE_MOVEMENT_THRESHOLD: f32 = 1.0; // pixels
-                    if (world_pos.x - spawn_pos.x).abs() > MOUSE_MOVEMENT_THRESHOLD {
+                    let mouse_moved = if let Some(last_pos) = last_cursor_pos.position {
+                        (world_pos - last_pos).length() > MOUSE_MOVEMENT_THRESHOLD
+                    } else {
+                        false // First frame, don't switch to mouse mode yet
+                    };
+
+                    if mouse_moved {
                         *input_mode = InputMode::Mouse;
                     }
+
+                    // Update last cursor position
+                    last_cursor_pos.position = Some(world_pos);
 
                     // Handle mouse cursor position (only in mouse mode)
                     if *input_mode == InputMode::Mouse {
@@ -534,6 +559,7 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.insert_resource(SpawnPosition { x: 0.0 });
         app.init_resource::<InputMode>();
+        app.init_resource::<LastCursorPosition>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, update_spawn_position);
 
@@ -556,6 +582,7 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.insert_resource(SpawnPosition { x: 0.0 });
         app.init_resource::<InputMode>();
+        app.init_resource::<LastCursorPosition>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, update_spawn_position);
 
@@ -580,6 +607,7 @@ mod tests {
         // Start at extreme position
         app.insert_resource(SpawnPosition { x: 10000.0 });
         app.init_resource::<InputMode>();
+        app.init_resource::<LastCursorPosition>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, update_spawn_position);
 
@@ -605,6 +633,7 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
         app.init_resource::<InputMode>();
+        app.init_resource::<LastCursorPosition>();
         app.init_resource::<NextFruitType>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.add_systems(Update, (spawn_held_fruit, update_spawn_position));
@@ -735,6 +764,7 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
         app.init_resource::<InputMode>();
+        app.init_resource::<LastCursorPosition>();
         app.init_resource::<NextFruitType>();
         app.init_resource::<ButtonInput<KeyCode>>();
         app.init_resource::<ButtonInput<MouseButton>>();
