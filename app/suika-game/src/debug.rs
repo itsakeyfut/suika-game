@@ -1,7 +1,7 @@
 //! Debug rendering and visualization tools
 //!
 //! This module provides debug visualization features for development,
-//! including physics collider rendering that can be toggled at runtime.
+//! including a GUI inspector window powered by bevy-inspector-egui.
 //!
 //! Debug features are only enabled in debug builds and are automatically
 //! stripped from release builds.
@@ -11,29 +11,39 @@ use bevy::prelude::*;
 /// Debug plugin for development tools and visualizations
 ///
 /// This plugin adds debug rendering capabilities including:
-/// - Physics collider visualization
-/// - Toggle debug rendering with the D key
+/// - Inspector GUI window (bevy-inspector-egui)
+/// - Physics collider visualization (Rapier debug renderer)
+/// - Resource and component inspection
 ///
 /// # Debug Builds Only
 ///
 /// All debug features are conditionally compiled and only available
 /// in debug builds (`#[cfg(debug_assertions)]`). They are completely
 /// removed from release builds.
+///
+/// # Controls
+///
+/// The inspector window can be used to:
+/// - Toggle physics collider rendering
+/// - Inspect entities and their components
+/// - Modify resource values at runtime
+/// - View game state in real-time
 pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
         #[cfg(debug_assertions)]
         {
+            use bevy_inspector_egui::quick::WorldInspectorPlugin;
             use bevy_rapier2d::render::RapierDebugRenderPlugin;
 
-            info!("Debug mode enabled - press D to toggle physics debug rendering");
+            info!("Debug mode enabled - inspector GUI window available");
 
             // Add Rapier debug renderer
             app.add_plugins(RapierDebugRenderPlugin::default());
 
-            // Add debug toggle system
-            app.add_systems(Update, toggle_debug_render);
+            // Add inspector GUI
+            app.add_plugins(WorldInspectorPlugin::new());
         }
 
         #[cfg(not(debug_assertions))]
@@ -41,32 +51,6 @@ impl Plugin for DebugPlugin {
             // In release builds, this plugin does nothing
             info!("Release mode - debug rendering disabled");
         }
-    }
-}
-
-/// Toggles physics debug rendering on/off with the D key
-///
-/// This system listens for the D key press and toggles the visibility
-/// of physics colliders and other Rapier debug information.
-///
-/// # Controls
-///
-/// - `D` key: Toggle debug rendering on/off
-#[cfg(debug_assertions)]
-fn toggle_debug_render(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut debug_render: ResMut<bevy_rapier2d::render::DebugRenderContext>,
-) {
-    if keyboard.just_pressed(KeyCode::KeyD) {
-        debug_render.enabled = !debug_render.enabled;
-
-        let status = if debug_render.enabled {
-            "enabled"
-        } else {
-            "disabled"
-        };
-
-        info!("Debug rendering {}", status);
     }
 }
 
