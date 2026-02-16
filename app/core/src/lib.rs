@@ -44,6 +44,7 @@ pub mod fruit;
 pub mod persistence;
 pub mod resources;
 pub mod states;
+pub mod systems;
 
 // Re-export commonly used types for convenience
 pub mod prelude {
@@ -71,6 +72,9 @@ pub mod prelude {
 
     // Persistence
     pub use crate::persistence::{HighscoreData, load_highscore, save_highscore, update_highscore};
+
+    // Systems
+    pub use crate::systems;
 
     // Plugin
     pub use crate::GameCorePlugin;
