@@ -21,9 +21,8 @@ fn test_phase3_integration() {
     // Add minimal plugins needed for testing
     app.add_plugins(MinimalPlugins);
 
-    // The game should be able to initialize without errors
-    // This is a basic smoke test
-    assert!(true, "Phase 3 integration test passed");
+    // Tick the app once to verify initialization completes without panicking
+    app.update();
 }
 
 #[test]
