@@ -228,7 +228,10 @@ pub fn handle_fruit_drop_input(
                 commands.entity(entity).insert((
                     RigidBody::Dynamic,
                     Velocity::zero(), // Reset velocity to drop straight down
-                    Restitution::coefficient(0.0), // No bounce
+                    Restitution {
+                        coefficient: params.restitution,
+                        combine_rule: CoefficientCombineRule::Min, // Use minimum restitution in collisions
+                    },
                     Friction::coefficient(params.friction),
                     ColliderMassProperties::Mass(params.mass),
                     Damping {
