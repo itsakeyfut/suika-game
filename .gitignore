@@ -3,4 +3,5 @@ Cargo.lock
 
 .claude/settings.local.json
 
-save/TODO.md
+save/
+TODO.md
