@@ -1,5 +1,6 @@
 mod camera;
 mod container;
+mod debug;
 
 use bevy::prelude::*;
 use bevy_kira_audio::AudioPlugin;
@@ -7,6 +8,7 @@ use bevy_rapier2d::prelude::*;
 
 use camera::setup_camera;
 use container::setup_container;
+use debug::DebugPlugin;
 use suika_game_assets::GameAssetsPlugin;
 use suika_game_audio::GameAudioPlugin;
 use suika_game_core::prelude::*;
@@ -28,7 +30,6 @@ fn main() {
         // Default gravity is -9.81 m/s², which equals -981 pixels/s²
         // This is approximately our target of -980 pixels/s² from constants::physics::GRAVITY
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugins(RapierDebugRenderPlugin::default()) // Debug rendering
         .add_plugins(AudioPlugin)
         // Application state
         .init_state::<AppState>()
@@ -42,6 +43,8 @@ fn main() {
         .add_plugins(GameCorePlugin)
         .add_plugins(GameUIPlugin)
         .add_plugins(GameAudioPlugin)
+        // Debug plugin (debug builds only)
+        .add_plugins(DebugPlugin)
         // Startup systems
         .add_systems(
             Startup,
