@@ -65,10 +65,10 @@ fn test_resources_available() {
 }
 
 #[test]
-fn test_app_state_transitions() {
+fn test_app_state_definitions() {
     use suika_game_core::prelude::*;
 
-    // Test that app states are defined correctly
+    // Test that all app states are defined correctly
     let _title = AppState::Title;
     let _playing = AppState::Playing;
     let _paused = AppState::Paused;
