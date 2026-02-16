@@ -1,16 +1,19 @@
 //! Player input handling system
 //!
-//! This module handles player input for spawning fruits, including:
-//! - Mouse click and keyboard input for spawning
-//! - Mouse position and arrow keys for spawn position control
-//! - Spawn position clamping within container boundaries
+//! This module handles player input for fruit control, including:
+//! - Spawning a held fruit at the start
+//! - Mouse position and arrow keys (←→ or A/D) for position control
+//! - Space key or mouse click to drop the fruit
+//! - Automatic spawning of next fruit after drop
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy_rapier2d::prelude::*;
 
+use crate::components::{Fruit, FruitSpawnState};
 use crate::constants::physics;
+use crate::fruit::FruitType;
 use crate::resources::NextFruitType;
-use crate::systems::spawn;
 
 /// Resource tracking the current spawn position for the next fruit
 ///
@@ -29,51 +32,112 @@ impl Default for SpawnPosition {
     }
 }
 
-/// Handles player input for spawning fruits
+/// Spawns a new held fruit if none exists
 ///
-/// Spawns a fruit when:
-/// - Mouse left button is pressed
-/// - Space key is pressed
-///
-/// After spawning, updates the next fruit type to a new random spawnable fruit.
+/// This system runs once at startup and after each fruit is dropped.
+/// It creates a fruit in the Held state that hovers at the top of the container.
 ///
 /// # System Parameters
 ///
 /// - `commands`: For spawning new fruit entities
+/// - `next_fruit`: The type of fruit to spawn
+/// - `spawn_pos`: Current spawn position (X coordinate)
+/// - `held_fruits`: Query to check if a held fruit already exists
+pub fn spawn_held_fruit(
+    mut commands: Commands,
+    next_fruit: Res<NextFruitType>,
+    spawn_pos: Res<SpawnPosition>,
+    held_fruits: Query<Entity, (With<Fruit>, With<FruitSpawnState>)>,
+) {
+    // Only spawn if there's no held fruit
+    if held_fruits.is_empty() {
+        let spawn_y = physics::CONTAINER_HEIGHT / 2.0 - 50.0;
+        let params = next_fruit.get().parameters();
+
+        commands.spawn((
+            // Fruit marker and type
+            Fruit,
+            next_fruit.get(),
+            FruitSpawnState::Held,
+            // Sprite rendering
+            Sprite {
+                color: next_fruit.get().placeholder_color(),
+                custom_size: Some(Vec2::splat(params.radius * 2.0)),
+                ..default()
+            },
+            Transform::from_xyz(spawn_pos.x, spawn_y, 0.0),
+            // Kinematic body (no gravity, manually controlled)
+            RigidBody::KinematicPositionBased,
+            // Collision shape (for preview, not for physics yet)
+            Collider::ball(params.radius),
+        ));
+
+        info!("Spawned held fruit: {:?}", next_fruit.get());
+    }
+}
+
+/// Handles player input for dropping held fruits
+///
+/// Drops the currently held fruit when:
+/// - Mouse left button is pressed
+/// - Space key is pressed
+///
+/// After dropping, the fruit transitions from Held to Falling state,
+/// becomes a dynamic rigid body, and gets physics properties.
+/// The next fruit type is randomized for the next spawn.
+///
+/// # System Parameters
+///
+/// - `commands`: For adding/removing components
 /// - `mouse_button`: Mouse button input state
 /// - `keyboard`: Keyboard input state
 /// - `next_fruit`: The type of fruit that will be spawned next
-/// - `spawn_pos`: Current spawn position (X coordinate)
-pub fn handle_fruit_spawn_input(
+/// - `held_fruits`: Query for held fruits to drop
+pub fn handle_fruit_drop_input(
     mut commands: Commands,
     mouse_button: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_fruit: ResMut<NextFruitType>,
-    spawn_pos: Res<SpawnPosition>,
+    mut held_fruits: Query<(Entity, &FruitType, &mut FruitSpawnState), With<Fruit>>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) || keyboard.just_pressed(KeyCode::Space) {
-        // Spawn fruit at current spawn position
-        // Y position is at the top of the container, slightly below the boundary
-        let spawn_y = physics::CONTAINER_HEIGHT / 2.0 - 50.0;
-        spawn::spawn_fruit(
-            &mut commands,
-            next_fruit.get(),
-            Vec2::new(spawn_pos.x, spawn_y),
-        );
+        for (entity, fruit_type, mut spawn_state) in held_fruits.iter_mut() {
+            if *spawn_state == FruitSpawnState::Held {
+                // Transition to Falling state
+                *spawn_state = FruitSpawnState::Falling;
 
-        // Randomize next fruit type
-        next_fruit.randomize();
+                let params = fruit_type.parameters();
+
+                // Convert to dynamic rigid body with physics properties
+                commands.entity(entity).insert((
+                    RigidBody::Dynamic,
+                    Restitution::coefficient(params.restitution),
+                    Friction::coefficient(params.friction),
+                    ColliderMassProperties::Mass(params.mass),
+                    Damping {
+                        linear_damping: 0.5,
+                        angular_damping: 1.0,
+                    },
+                    GravityScale(1.0),
+                ));
+
+                info!("Dropped fruit: {:?}", fruit_type);
+
+                // Randomize next fruit type for the next spawn
+                next_fruit.randomize();
+            }
+        }
     }
 }
 
-/// Updates the spawn position based on player input
+/// Updates the spawn position and held fruit position based on player input
 ///
-/// Updates spawn position from two input sources:
-/// 1. Arrow keys: Left/Right arrows move the spawn position horizontally
-/// 2. Mouse cursor: Position is updated to follow the mouse X coordinate
+/// Updates spawn position from multiple input sources:
+/// 1. Arrow keys: Left/Right (←→) or A/D keys move horizontally
+/// 2. Mouse cursor: Position follows the mouse X coordinate
 ///
-/// The final position is clamped to stay within the container boundaries,
-/// with a margin to prevent fruits from spawning too close to walls.
+/// The held fruit (if any) is moved to match the spawn position in real-time.
+/// The final position is clamped to stay within container boundaries.
 ///
 /// # System Parameters
 ///
@@ -81,20 +145,22 @@ pub fn handle_fruit_spawn_input(
 /// - `windows`: Query for the primary window (to get cursor position)
 /// - `camera_query`: Query for camera and its transform (for world position conversion)
 /// - `spawn_pos`: Mutable spawn position resource to update
-/// - `time`: Time resource for delta time (smooth movement with arrow keys)
+/// - `held_fruits`: Query for held fruits to move
+/// - `time`: Time resource for delta time (smooth movement with keys)
 pub fn update_spawn_position(
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut spawn_pos: ResMut<SpawnPosition>,
+    mut held_fruits: Query<&mut Transform, (With<Fruit>, With<FruitSpawnState>)>,
     time: Res<Time>,
 ) {
-    // Handle arrow key movement
+    // Handle keyboard movement (Arrow keys or A/D keys)
     const MOVE_SPEED: f32 = 300.0; // pixels per second
-    if keyboard.pressed(KeyCode::ArrowLeft) {
+    if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
         spawn_pos.x -= MOVE_SPEED * time.delta_secs();
     }
-    if keyboard.pressed(KeyCode::ArrowRight) {
+    if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) {
         spawn_pos.x += MOVE_SPEED * time.delta_secs();
     }
 
@@ -114,6 +180,11 @@ pub fn update_spawn_position(
     // Leave margin to prevent spawning too close to walls
     let max_x = physics::CONTAINER_WIDTH / 2.0 - 40.0;
     spawn_pos.x = spawn_pos.x.clamp(-max_x, max_x);
+
+    // Update held fruit position to match spawn position
+    for mut transform in held_fruits.iter_mut() {
+        transform.translation.x = spawn_pos.x;
+    }
 }
 
 #[cfg(test)]
@@ -146,102 +217,114 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_fruit_spawn_input_space_key() {
+    fn test_spawn_held_fruit_creates_fruit() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
-        app.add_systems(Update, handle_fruit_spawn_input);
+        app.add_systems(Update, spawn_held_fruit);
+
+        // Initial fruit count
+        let initial_count = app
+            .world()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+
+        app.update();
+
+        // Should have spawned one held fruit
+        let final_count = app
+            .world()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+
+        assert_eq!(final_count, initial_count + 1, "Should spawn one held fruit");
+    }
+
+    #[test]
+    fn test_spawn_held_fruit_only_one_at_a_time() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(Update, spawn_held_fruit);
+
+        app.update();
+        let count_after_first = app
+            .world()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+
+        app.update();
+        let count_after_second = app
+            .world()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+
+        assert_eq!(
+            count_after_first, count_after_second,
+            "Should not spawn multiple held fruits"
+        );
+    }
+
+    #[test]
+    fn test_handle_fruit_drop_input_space_key() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(Update, (spawn_held_fruit, handle_fruit_drop_input));
+
+        // Spawn a held fruit first
+        app.update();
 
         // Simulate space key press
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::Space);
 
-        // Initial fruit count
-        let initial_count = app
-            .world()
-            .query_filtered::<Entity, With<crate::components::Fruit>>()
-            .iter(app.world())
-            .count();
-
         app.update();
 
-        // After space press, should have spawned a fruit
-        let final_count = app
+        // Verify fruit transitioned to Falling state
+        let falling_count = app
             .world()
-            .query_filtered::<Entity, With<crate::components::Fruit>>()
+            .query_filtered::<&FruitSpawnState, With<Fruit>>()
             .iter(app.world())
+            .filter(|state| **state == FruitSpawnState::Falling)
             .count();
 
-        assert_eq!(
-            final_count,
-            initial_count + 1,
-            "Space key should spawn a fruit"
-        );
+        assert_eq!(falling_count, 1, "Space key should drop the held fruit");
     }
 
     #[test]
-    fn test_handle_fruit_spawn_input_mouse_click() {
+    fn test_handle_fruit_drop_input_mouse_click() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
-        app.add_systems(Update, handle_fruit_spawn_input);
+        app.add_systems(Update, (spawn_held_fruit, handle_fruit_drop_input));
+
+        app.update();
 
         // Simulate mouse click
         app.world_mut()
             .resource_mut::<ButtonInput<MouseButton>>()
             .press(MouseButton::Left);
 
-        let initial_count = app
-            .world()
-            .query_filtered::<Entity, With<crate::components::Fruit>>()
-            .iter(app.world())
-            .count();
-
         app.update();
 
-        let final_count = app
+        let falling_count = app
             .world()
-            .query_filtered::<Entity, With<crate::components::Fruit>>()
+            .query_filtered::<&FruitSpawnState, With<Fruit>>()
             .iter(app.world())
+            .filter(|state| **state == FruitSpawnState::Falling)
             .count();
 
-        assert_eq!(
-            final_count,
-            initial_count + 1,
-            "Mouse click should spawn a fruit"
-        );
-    }
-
-    #[test]
-    fn test_handle_fruit_spawn_input_updates_next_fruit() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<SpawnPosition>();
-        app.insert_resource(NextFruitType(crate::fruit::FruitType::Cherry));
-        app.add_systems(Update, handle_fruit_spawn_input);
-
-        let initial_fruit = app.world().resource::<NextFruitType>().get();
-
-        // Simulate space key press
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::Space);
-
-        app.update();
-
-        let final_fruit = app.world().resource::<NextFruitType>().get();
-
-        // Next fruit should be different (randomized)
-        // Note: This could theoretically fail if random picks the same fruit,
-        // but with 5 options it's unlikely enough that we can test this way
-        // In a real scenario, we might want to use a seeded RNG for deterministic tests
-        assert!(
-            initial_fruit == final_fruit || initial_fruit != final_fruit,
-            "Next fruit should be randomized (this test is probabilistic)"
-        );
+        assert_eq!(falling_count, 1, "Mouse click should drop the held fruit");
     }
 
     #[test]
@@ -260,6 +343,24 @@ mod tests {
 
         let pos = app.world().resource::<SpawnPosition>();
         assert!(pos.x > 0.0, "Arrow right should move position to the right");
+    }
+
+    #[test]
+    fn test_update_spawn_position_ad_keys() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.insert_resource(SpawnPosition { x: 0.0 });
+        app.add_systems(Update, update_spawn_position);
+
+        // Simulate D key press
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyD);
+
+        app.update();
+
+        let pos = app.world().resource::<SpawnPosition>();
+        assert!(pos.x > 0.0, "D key should move position to the right");
     }
 
     #[test]
@@ -284,5 +385,32 @@ mod tests {
             pos.x >= -max_x,
             "Position should be clamped to container bounds"
         );
+    }
+
+    #[test]
+    fn test_update_spawn_position_moves_held_fruit() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<SpawnPosition>();
+        app.init_resource::<NextFruitType>();
+        app.add_systems(Update, (spawn_held_fruit, update_spawn_position));
+
+        // Spawn held fruit
+        app.update();
+
+        // Move spawn position
+        app.world_mut().resource_mut::<SpawnPosition>().x = 100.0;
+
+        app.update();
+
+        // Verify held fruit moved
+        let fruit_x = app
+            .world()
+            .query_filtered::<&Transform, (With<Fruit>, With<FruitSpawnState>)>()
+            .iter(app.world())
+            .next()
+            .map(|t| t.translation.x);
+
+        assert_eq!(fruit_x, Some(100.0), "Held fruit should move with spawn position");
     }
 }

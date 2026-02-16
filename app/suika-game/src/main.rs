@@ -12,7 +12,9 @@ use debug::DebugPlugin;
 use suika_game_assets::GameAssetsPlugin;
 use suika_game_audio::GameAudioPlugin;
 use suika_game_core::prelude::*;
-use suika_game_core::systems::input::{handle_fruit_spawn_input, update_spawn_position};
+use suika_game_core::systems::input::{
+    handle_fruit_drop_input, spawn_held_fruit, update_spawn_position,
+};
 use suika_game_ui::GameUIPlugin;
 
 fn main() {
@@ -50,14 +52,20 @@ fn main() {
         // Startup systems
         .add_systems(
             Startup,
-            (setup_camera, setup_container, load_highscore_system),
+            (
+                setup_camera,
+                setup_container,
+                load_highscore_system,
+                spawn_held_fruit,
+            ),
         )
         // Update systems (run every frame)
         .add_systems(
             Update,
             (
                 update_spawn_position,
-                handle_fruit_spawn_input.after(update_spawn_position),
+                handle_fruit_drop_input.after(update_spawn_position),
+                spawn_held_fruit.after(handle_fruit_drop_input),
             ),
         )
         .run();
