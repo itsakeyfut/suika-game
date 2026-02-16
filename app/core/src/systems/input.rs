@@ -39,18 +39,13 @@ impl Default for SpawnPosition {
 ///
 /// Tracks whether the player is currently using keyboard or mouse input.
 /// The mode automatically switches based on which input device was used most recently.
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InputMode {
     /// Player is using keyboard (arrow keys or A/D)
     Keyboard,
     /// Player is using mouse cursor
+    #[default]
     Mouse,
-}
-
-impl Default for InputMode {
-    fn default() -> Self {
-        Self::Mouse // Default to mouse mode
-    }
 }
 
 /// Tracks the last known cursor position to detect mouse movement
@@ -58,16 +53,10 @@ impl Default for InputMode {
 /// Used to distinguish between actual mouse movement and position changes
 /// caused by keyboard input. Only switches to mouse mode when the cursor
 /// itself moves.
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct LastCursorPosition {
     /// Last known cursor position in world coordinates
     pub position: Option<Vec2>,
-}
-
-impl Default for LastCursorPosition {
-    fn default() -> Self {
-        Self { position: None }
-    }
 }
 
 /// Spawns a new held fruit if none exists
@@ -77,43 +66,32 @@ impl Default for LastCursorPosition {
 ///
 /// **Important**: Will NOT spawn if there's a falling fruit (waiting for it to land first).
 ///
+/// After spawning the fruit, the next fruit type is randomized for the preview display.
+///
 /// # System Parameters
 ///
 /// - `commands`: For spawning new fruit entities
-/// - `next_fruit`: The type of fruit to spawn
+/// - `next_fruit`: The type of fruit to spawn (mutable to randomize after spawn)
 /// - `spawn_pos`: Current spawn position (X coordinate)
 /// - `fruit_states`: Query to check fruit spawn states
 pub fn spawn_held_fruit(
     mut commands: Commands,
-    next_fruit: Res<NextFruitType>,
+    mut next_fruit: ResMut<NextFruitType>,
     spawn_pos: Res<SpawnPosition>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
 ) {
-    // Check if there's a held or falling fruit
-    let has_held_fruit = fruit_states
-        .iter()
-        .any(|state| *state == FruitSpawnState::Held);
-
-    let has_falling_fruit = fruit_states
-        .iter()
-        .any(|state| *state == FruitSpawnState::Falling);
-
-    // Debug: Count fruits by state
-    let held_count = fruit_states
-        .iter()
-        .filter(|s| **s == FruitSpawnState::Held)
-        .count();
-    let falling_count = fruit_states
-        .iter()
-        .filter(|s| **s == FruitSpawnState::Falling)
-        .count();
-    let landed_count = fruit_states
-        .iter()
-        .filter(|s| **s == FruitSpawnState::Landed)
-        .count();
+    // Count fruits by state in a single iteration
+    let (held_count, falling_count, landed_count) =
+        fruit_states
+            .iter()
+            .fold((0u32, 0u32, 0u32), |(h, f, l), state| match *state {
+                FruitSpawnState::Held => (h + 1, f, l),
+                FruitSpawnState::Falling => (h, f + 1, l),
+                FruitSpawnState::Landed => (h, f, l + 1),
+            });
 
     if held_count > 0 || falling_count > 0 || landed_count > 0 {
-        info!(
+        trace!(
             "Fruit states - Held: {}, Falling: {}, Landed: {}",
             held_count, falling_count, landed_count
         );
@@ -122,7 +100,7 @@ pub fn spawn_held_fruit(
     // Only spawn if:
     // 1. No fruit in Held state
     // 2. No fruit in Falling state (wait for it to land first)
-    if !has_held_fruit && !has_falling_fruit {
+    if held_count == 0 && falling_count == 0 {
         let spawn_y = physics::CONTAINER_HEIGHT / 2.0 - 50.0;
         let params = next_fruit.get().parameters();
 
@@ -149,6 +127,10 @@ pub fn spawn_held_fruit(
         ));
 
         info!("Spawned held fruit: {:?}", next_fruit.get());
+
+        // Randomize next fruit type for preview display
+        // This ensures the preview shows the NEXT fruit, not the current held fruit
+        next_fruit.randomize();
     }
 }
 
@@ -175,26 +157,26 @@ pub fn detect_fruit_landing(
             let mut entities_to_land = Vec::new();
 
             // Check if entity1 is a falling fruit
-            if let Ok(spawn_state) = fruit_query.get(*entity1) {
-                if *spawn_state == FruitSpawnState::Falling {
-                    let hit_bottom_wall = bottom_wall_query.contains(*entity2);
-                    let hit_fruit = fruit_query.contains(*entity2);
+            if let Ok(spawn_state) = fruit_query.get(*entity1)
+                && *spawn_state == FruitSpawnState::Falling
+            {
+                let hit_bottom_wall = bottom_wall_query.contains(*entity2);
+                let hit_fruit = fruit_query.contains(*entity2);
 
-                    if hit_bottom_wall || hit_fruit {
-                        entities_to_land.push((*entity1, hit_bottom_wall));
-                    }
+                if hit_bottom_wall || hit_fruit {
+                    entities_to_land.push((*entity1, hit_bottom_wall));
                 }
             }
 
             // Check if entity2 is a falling fruit
-            if let Ok(spawn_state) = fruit_query.get(*entity2) {
-                if *spawn_state == FruitSpawnState::Falling {
-                    let hit_bottom_wall = bottom_wall_query.contains(*entity1);
-                    let hit_fruit = fruit_query.contains(*entity1);
+            if let Ok(spawn_state) = fruit_query.get(*entity2)
+                && *spawn_state == FruitSpawnState::Falling
+            {
+                let hit_bottom_wall = bottom_wall_query.contains(*entity1);
+                let hit_fruit = fruit_query.contains(*entity1);
 
-                    if hit_bottom_wall || hit_fruit {
-                        entities_to_land.push((*entity2, hit_bottom_wall));
-                    }
+                if hit_bottom_wall || hit_fruit {
+                    entities_to_land.push((*entity2, hit_bottom_wall));
                 }
             }
 
@@ -220,20 +202,17 @@ pub fn detect_fruit_landing(
 ///
 /// After dropping, the fruit transitions from Held to Falling state,
 /// becomes a dynamic rigid body, and gets physics properties.
-/// The next fruit type is randomized for the next spawn.
 ///
 /// # System Parameters
 ///
 /// - `commands`: For adding/removing components
 /// - `mouse_button`: Mouse button input state
 /// - `keyboard`: Keyboard input state
-/// - `next_fruit`: The type of fruit that will be spawned next
 /// - `held_fruits`: Query for held fruits to drop
 pub fn handle_fruit_drop_input(
     mut commands: Commands,
     mouse_button: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut next_fruit: ResMut<NextFruitType>,
     mut held_fruits: Query<(Entity, &FruitType, &mut FruitSpawnState), With<Fruit>>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) || keyboard.just_pressed(KeyCode::Space) {
@@ -260,9 +239,6 @@ pub fn handle_fruit_drop_input(
                 ));
 
                 info!("Dropped fruit: {:?}", fruit_type);
-
-                // Randomize next fruit type for the next spawn
-                next_fruit.randomize();
             }
         }
     }
@@ -290,6 +266,7 @@ pub fn handle_fruit_drop_input(
 /// - `input_mode`: Current input mode (keyboard or mouse)
 /// - `held_fruits`: Query for held fruits to move (only Held state)
 /// - `time`: Time resource for delta time (smooth movement with keys)
+#[allow(clippy::too_many_arguments)]
 pub fn update_spawn_position(
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window, With<PrimaryWindow>>,
@@ -322,31 +299,30 @@ pub fn update_spawn_position(
     }
 
     // Check for mouse movement and switch mode if detected
-    if let Ok(window) = windows.single() {
-        if let Some(cursor_pos) = window.cursor_position() {
-            if let Ok((camera, camera_transform)) = camera_query.single() {
-                // Convert viewport coordinates to world coordinates
-                if let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) {
-                    // Detect actual mouse movement by comparing with last cursor position
-                    const MOUSE_MOVEMENT_THRESHOLD: f32 = 1.0; // pixels
-                    let mouse_moved = if let Some(last_pos) = last_cursor_pos.position {
-                        (world_pos - last_pos).length() > MOUSE_MOVEMENT_THRESHOLD
-                    } else {
-                        false // First frame, don't switch to mouse mode yet
-                    };
+    if let Ok(window) = windows.single()
+        && let Some(cursor_pos) = window.cursor_position()
+        && let Ok((camera, camera_transform)) = camera_query.single()
+    {
+        // Convert viewport coordinates to world coordinates
+        if let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) {
+            // Detect actual mouse movement by comparing with last cursor position
+            const MOUSE_MOVEMENT_THRESHOLD: f32 = 1.0; // pixels
+            let mouse_moved = if let Some(last_pos) = last_cursor_pos.position {
+                (world_pos - last_pos).length() > MOUSE_MOVEMENT_THRESHOLD
+            } else {
+                false // First frame, don't switch to mouse mode yet
+            };
 
-                    if mouse_moved {
-                        *input_mode = InputMode::Mouse;
-                    }
+            if mouse_moved {
+                *input_mode = InputMode::Mouse;
+            }
 
-                    // Update last cursor position
-                    last_cursor_pos.position = Some(world_pos);
+            // Update last cursor position
+            last_cursor_pos.position = Some(world_pos);
 
-                    // Handle mouse cursor position (only in mouse mode)
-                    if *input_mode == InputMode::Mouse {
-                        spawn_pos.x = world_pos.x;
-                    }
-                }
+            // Handle mouse cursor position (only in mouse mode)
+            if *input_mode == InputMode::Mouse {
+                spawn_pos.x = world_pos.x;
             }
         }
     }
