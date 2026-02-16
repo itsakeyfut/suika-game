@@ -29,15 +29,13 @@ fn test_phase3_integration() {
 fn test_core_components_available() {
     use suika_game_core::prelude::*;
 
-    // Test that all Phase 3 components are available and can be instantiated
+    // Test that all Phase 3 custom components are available and can be instantiated
 
-    let _camera = Camera2d;
     let _container = Container;
     let _boundary_line = BoundaryLine;
     let _fruit = Fruit;
 
-    // If we got here, all components are available
-    assert!(true, "All core components are available");
+    // If we got here, all custom components are available
 }
 
 #[test]
