@@ -407,7 +407,7 @@ mod tests {
     #[test]
     fn test_spawn_position_clamp() {
         // Use default fruit radius (20.0) to match system behavior
-        let max_x = physics::CONTAINER_WIDTH / 2.0 - 20.0;
+        let max_x = 600.0 / 2.0 - 20.0; // Default container width
 
         // Test clamping
         let mut pos = SpawnPosition { x: 1000.0 };
@@ -637,7 +637,7 @@ mod tests {
 
         let pos = app.world().resource::<SpawnPosition>();
         // Use default fruit radius (20.0) to match system behavior
-        let max_x = physics::CONTAINER_WIDTH / 2.0 - 20.0;
+        let max_x = 600.0 / 2.0 - 20.0; // Default container width
 
         assert!(
             pos.x <= max_x,

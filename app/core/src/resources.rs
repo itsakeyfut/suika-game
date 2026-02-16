@@ -6,7 +6,6 @@
 
 use bevy::prelude::*;
 
-use crate::constants::{combo, game_over};
 use crate::fruit::FruitType;
 
 /// Main game state resource
@@ -45,8 +44,10 @@ impl Default for GameState {
 pub struct ComboTimer {
     /// Time in seconds since the last merge occurred
     pub time_since_last_merge: f32,
-    /// Duration of the combo window in seconds
+    /// Duration of the combo window in seconds (loaded from game_rules.ron)
     pub combo_window: f32,
+    /// Maximum combo count (loaded from game_rules.ron)
+    pub combo_max: u32,
     /// Current combo count (starts at 1, increases with consecutive merges)
     pub current_combo: u32,
 }
@@ -56,7 +57,9 @@ impl Default for ComboTimer {
         Self {
             // Start with max value so first merge doesn't count as combo
             time_since_last_merge: f32::MAX,
-            combo_window: combo::COMBO_WINDOW,
+            // Default values (updated from game_rules.ron at runtime)
+            combo_window: 2.0,
+            combo_max: 10,
             current_combo: 1,
         }
     }
@@ -76,7 +79,7 @@ impl ComboTimer {
     /// Otherwise, resets to combo of 1.
     pub fn register_merge(&mut self) {
         if self.time_since_last_merge <= self.combo_window {
-            self.current_combo = (self.current_combo + 1).min(combo::COMBO_MAX);
+            self.current_combo = (self.current_combo + 1).min(self.combo_max);
         } else {
             self.current_combo = 1;
         }
@@ -115,7 +118,8 @@ impl Default for GameOverTimer {
     fn default() -> Self {
         Self {
             time_over_boundary: 0.0,
-            warning_threshold: game_over::TIMER,
+            // Default game over timer (loaded from game_rules.ron at runtime)
+            warning_threshold: 3.0,
             is_warning: false,
         }
     }
@@ -202,7 +206,8 @@ mod tests {
     fn test_combo_timer_default() {
         let timer = ComboTimer::default();
         assert_eq!(timer.time_since_last_merge, f32::MAX);
-        assert_eq!(timer.combo_window, combo::COMBO_WINDOW);
+        assert_eq!(timer.combo_window, 2.0); // Default value
+        assert_eq!(timer.combo_max, 10); // Default value
         assert_eq!(timer.current_combo, 1);
         assert!(!timer.is_combo());
     }
@@ -259,14 +264,14 @@ mod tests {
             timer.register_merge();
         }
 
-        assert_eq!(timer.current_combo, combo::COMBO_MAX);
+        assert_eq!(timer.current_combo, 10); // Default max combo
     }
 
     #[test]
     fn test_game_over_timer_default() {
         let timer = GameOverTimer::default();
         assert_eq!(timer.time_over_boundary, 0.0);
-        assert_eq!(timer.warning_threshold, game_over::TIMER);
+        assert_eq!(timer.warning_threshold, 3.0); // Default value
         assert!(!timer.is_warning);
         assert!(!timer.is_game_over());
     }

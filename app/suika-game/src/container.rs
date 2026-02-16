@@ -241,13 +241,13 @@ mod tests {
         app.add_systems(Startup, setup_container);
         app.update();
 
-        // Verify boundary line Y position
+        // Verify boundary line Y position (default from fallback)
         let mut query = app.world_mut().query::<(&BoundaryLine, &Transform)>();
         for (_, transform) in query.iter(app.world()) {
+            // Using fallback value 300.0 since PhysicsConfig not loaded in test
             assert_eq!(
-                transform.translation.y,
-                constants::physics::BOUNDARY_LINE_Y,
-                "Boundary line should be at BOUNDARY_LINE_Y"
+                transform.translation.y, 300.0,
+                "Boundary line should be at default position"
             );
         }
     }

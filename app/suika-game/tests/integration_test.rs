@@ -38,17 +38,8 @@ fn test_core_components_available() {
     // If we got here, all custom components are available
 }
 
-#[test]
-fn test_constants_defined() {
-    use suika_game_core::constants;
-
-    // Verify all Phase 3 constants are defined with expected values
-    assert_eq!(constants::physics::GRAVITY, -980.0);
-    assert_eq!(constants::physics::CONTAINER_WIDTH, 600.0);
-    assert_eq!(constants::physics::CONTAINER_HEIGHT, 800.0);
-    assert_eq!(constants::physics::WALL_THICKNESS, 20.0);
-    assert_eq!(constants::physics::BOUNDARY_LINE_Y, 300.0);
-}
+// Note: Game parameters are now loaded from RON config files.
+// See app/core/src/config.rs for configuration tests.
 
 #[test]
 fn test_resources_available() {

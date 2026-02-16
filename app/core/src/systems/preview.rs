@@ -310,7 +310,7 @@ mod tests {
             .unwrap();
 
         // Verify preview is positioned to the right of the container
-        let expected_x = physics::CONTAINER_WIDTH / 2.0 + 120.0;
+        let expected_x = 600.0 / 2.0 + 120.0; // Default container width
         assert_eq!(
             transform.translation.x, expected_x,
             "Preview should be positioned on the right side"

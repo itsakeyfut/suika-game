@@ -400,6 +400,21 @@ fn update_preview(
     );
 }
 
+/// Updates game timer resources when game rules config changes
+fn update_game_timers(
+    combo_timer: &mut crate::resources::ComboTimer,
+    game_over_timer: &mut crate::resources::GameOverTimer,
+    config: &GameRulesConfig,
+) {
+    combo_timer.combo_window = config.combo_window;
+    combo_timer.combo_max = config.combo_max;
+    game_over_timer.warning_threshold = config.game_over_timer;
+
+    info!("⏱️ Game timers updated: combo_window={:.1}s, combo_max={}, game_over={:.1}s",
+        config.combo_window, config.combo_max, config.game_over_timer
+    );
+}
+
 /// Handles hot-reloading of physics configuration
 ///
 /// Monitors for changes to the physics.ron file and logs when updates are detected.
@@ -480,17 +495,27 @@ fn hot_reload_game_rules_config(
     fruits_handle: Res<FruitsConfigHandle>,
     fruits_assets: Res<Assets<FruitsConfig>>,
     next_fruit: Res<crate::resources::NextFruitType>,
+    mut combo_timer: ResMut<crate::resources::ComboTimer>,
+    mut game_over_timer: ResMut<crate::resources::GameOverTimer>,
 ) {
     for event in events.read() {
         match event {
             AssetEvent::Added { id: _ } => {
-                info!("✅ Game rules config loaded");
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    info!("✅ Game rules config loaded");
+
+                    // Initialize game timers from config
+                    update_game_timers(&mut combo_timer, &mut game_over_timer, config);
+                }
             }
             AssetEvent::Modified { id: _ } => {
                 if let Some(config) = config_assets.get(&config_handle.0) {
                     info!("🔥 Hot-reloading game rules config!");
                     info!("   Spawnable fruits: {}, Combo window: {}s, Game over timer: {}s",
                         config.spawnable_fruit_count, config.combo_window, config.game_over_timer);
+
+                    // Update game timers
+                    update_game_timers(&mut combo_timer, &mut game_over_timer, config);
 
                     // Update preview display if all configs are loaded
                     if let Some(physics_config) = physics_assets.get(&physics_handle.0) {
