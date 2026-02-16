@@ -528,7 +528,10 @@ fn hot_reload_physics_config(
                             deleted_count += 1;
                             info!(
                                 "🗑️ Deleted out-of-bounds fruit {:?} at ({:.1}, {:.1}), radius={}",
-                                fruit_type, transform.translation.x, transform.translation.y, radius
+                                fruit_type,
+                                transform.translation.x,
+                                transform.translation.y,
+                                radius
                             );
                         }
                     }
@@ -760,8 +763,16 @@ GameRulesConfig(
 
         // Test out of bounds (container_width/2 = 200.0, container_height/2 = 300.0)
         // Taking radius into account: max_x = 200 - 20 = 180, max_y = 300 - 20 = 280
-        assert!(is_out_of_bounds(Vec3::new(300.0, 0.0, 0.0), radius, &config)); // Outside X
-        assert!(is_out_of_bounds(Vec3::new(0.0, 400.0, 0.0), radius, &config)); // Outside Y
+        assert!(is_out_of_bounds(
+            Vec3::new(300.0, 0.0, 0.0),
+            radius,
+            &config
+        )); // Outside X
+        assert!(is_out_of_bounds(
+            Vec3::new(0.0, 400.0, 0.0),
+            radius,
+            &config
+        )); // Outside Y
         assert!(is_out_of_bounds(
             Vec3::new(-250.0, 0.0, 0.0),
             radius,
@@ -774,7 +785,11 @@ GameRulesConfig(
         )); // Outside -Y
 
         // Test edge cases - fruit partially outside
-        assert!(is_out_of_bounds(Vec3::new(185.0, 0.0, 0.0), radius, &config)); // Center at 185, edge at 205 > 200
+        assert!(is_out_of_bounds(
+            Vec3::new(185.0, 0.0, 0.0),
+            radius,
+            &config
+        )); // Center at 185, edge at 205 > 200
         assert!(!is_out_of_bounds(
             Vec3::new(175.0, 0.0, 0.0),
             radius,
