@@ -90,9 +90,8 @@ pub mod prelude {
     // Events
     pub use crate::events::FruitMergeEvent;
 
-    // Collision & Merge
+    // Collision
     pub use crate::systems::collision::ProcessedCollisions;
-    pub use crate::systems::merge::handle_fruit_merge;
 
     // Plugin
     pub use crate::GameCorePlugin;

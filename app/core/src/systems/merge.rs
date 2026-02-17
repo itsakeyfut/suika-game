@@ -90,8 +90,9 @@ pub fn handle_fruit_merge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::Fruit;
-    use crate::config::{FruitConfigEntry, FruitsConfig};
+    use crate::components::{Fruit, FruitSpawnState};
+    use crate::config::{FruitConfigEntry, FruitsConfig, FruitsConfigHandle};
+    use crate::events::FruitMergeEvent;
     use crate::fruit::FruitType;
     use crate::systems::spawn::spawn_fruit;
 
@@ -110,67 +111,178 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_watermelon_has_no_next() {
-        // Watermelon is the final stage and should not produce a next fruit
-        assert_eq!(FruitType::Watermelon.next(), None);
-    }
-
-    #[test]
-    fn test_all_other_fruits_have_next() {
-        let non_final = [
-            FruitType::Cherry,
-            FruitType::Strawberry,
-            FruitType::Grape,
-            FruitType::Dekopon,
-            FruitType::Persimmon,
-            FruitType::Apple,
-            FruitType::Pear,
-            FruitType::Peach,
-            FruitType::Pineapple,
-            FruitType::Melon,
-        ];
-        for ft in non_final {
-            assert!(ft.next().is_some(), "{:?} should have a next evolution", ft);
-        }
-    }
-
-    #[test]
-    fn test_spawn_fruit_creates_valid_entity() {
+    /// Build a minimal app wired with the handle_fruit_merge system and a
+    /// pre-loaded FruitsConfig asset so tests can drive it directly.
+    fn setup_merge_app() -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
-        let config = create_test_config();
+        app.add_message::<FruitMergeEvent>();
+        app.add_systems(Update, handle_fruit_merge);
 
+        let mut fruits_assets = Assets::<FruitsConfig>::default();
+        let handle = fruits_assets.add(create_test_config());
+        app.insert_resource(fruits_assets);
+        app.insert_resource(FruitsConfigHandle(handle));
+
+        app
+    }
+
+    /// Spawn a minimal fruit entity suitable for merge tests
+    fn spawn_test_fruit(app: &mut App, fruit_type: FruitType) -> Entity {
+        let config = create_test_config();
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(
-            &mut commands,
-            FruitType::Strawberry,
-            Vec2::new(0.0, 0.0),
-            &config,
-        );
+        let entity = spawn_fruit(&mut commands, fruit_type, Vec2::ZERO, &config);
+        // Flush commands so entity exists before further operations
+        app.update();
+        entity
+    }
+
+    #[test]
+    fn test_merge_spawns_next_evolution_fruit() {
+        let mut app = setup_merge_app();
+
+        let e1 = spawn_test_fruit(&mut app, FruitType::Cherry);
+        let e2 = spawn_test_fruit(&mut app, FruitType::Cherry);
+
+        // Send a merge event for the two cherries
+        app.world_mut().write_message(FruitMergeEvent {
+            entity1: e1,
+            entity2: e2,
+            fruit_type: FruitType::Cherry,
+            position: Vec2::ZERO,
+        });
+
         app.update();
 
+        // Source entities should be despawned
         assert!(
-            app.world().get_entity(entity).is_ok(),
-            "Spawned merge result entity should exist"
+            app.world().get_entity(e1).is_err(),
+            "entity1 should be despawned after merge"
         );
         assert!(
-            app.world().get::<Fruit>(entity).is_some(),
-            "Merged entity should have Fruit component"
+            app.world().get_entity(e2).is_err(),
+            "entity2 should be despawned after merge"
+        );
+
+        // One new Strawberry fruit should have been spawned
+        let strawberry_count = app
+            .world_mut()
+            .query_filtered::<&FruitType, With<Fruit>>()
+            .iter(app.world())
+            .filter(|&&ft| ft == FruitType::Strawberry)
+            .count();
+
+        assert_eq!(
+            strawberry_count,
+            1,
+            "Merging two cherries should spawn exactly one strawberry"
         );
     }
 
     #[test]
-    fn test_duplicate_despawn_prevention() {
-        // Verify that a HashSet correctly deduplicates entities
-        let mut despawned: HashSet<Entity> = HashSet::new();
-        let e = Entity::from_bits(42);
+    fn test_watermelon_merge_despawns_both_without_new_fruit() {
+        let mut app = setup_merge_app();
 
-        despawned.insert(e);
-        assert!(despawned.contains(&e));
+        let e1 = spawn_test_fruit(&mut app, FruitType::Watermelon);
+        let e2 = spawn_test_fruit(&mut app, FruitType::Watermelon);
 
-        // Inserting again should be a no-op
-        despawned.insert(e);
-        assert_eq!(despawned.len(), 1);
+        let fruit_count_before = app
+            .world_mut()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+
+        app.world_mut().write_message(FruitMergeEvent {
+            entity1: e1,
+            entity2: e2,
+            fruit_type: FruitType::Watermelon,
+            position: Vec2::ZERO,
+        });
+
+        app.update();
+
+        let fruit_count_after = app
+            .world_mut()
+            .query_filtered::<Entity, With<Fruit>>()
+            .iter(app.world())
+            .count();
+
+        // Both watermelons removed, no new fruit spawned → count decreases by 2
+        assert_eq!(
+            fruit_count_after,
+            fruit_count_before - 2,
+            "Watermelon merge should remove 2 fruits and spawn none"
+        );
+    }
+
+    #[test]
+    fn test_duplicate_merge_event_only_despawns_once() {
+        let mut app = setup_merge_app();
+
+        let e1 = spawn_test_fruit(&mut app, FruitType::Cherry);
+        let e2 = spawn_test_fruit(&mut app, FruitType::Cherry);
+        let e3 = spawn_test_fruit(&mut app, FruitType::Cherry);
+
+        // Two events share entity e1 — only the first should be processed
+        app.world_mut().write_message(FruitMergeEvent {
+            entity1: e1,
+            entity2: e2,
+            fruit_type: FruitType::Cherry,
+            position: Vec2::ZERO,
+        });
+        app.world_mut().write_message(FruitMergeEvent {
+            entity1: e1,
+            entity2: e3,
+            fruit_type: FruitType::Cherry,
+            position: Vec2::ZERO,
+        });
+
+        // Should not panic even though e1 would be despawned twice without dedup
+        app.update();
+
+        // Only one strawberry should be spawned (from the first event only)
+        let strawberry_count = app
+            .world_mut()
+            .query_filtered::<&FruitType, With<Fruit>>()
+            .iter(app.world())
+            .filter(|&&ft| ft == FruitType::Strawberry)
+            .count();
+
+        assert_eq!(
+            strawberry_count,
+            1,
+            "Duplicate events sharing an entity should produce only one merged fruit"
+        );
+    }
+
+    #[test]
+    fn test_merged_fruit_has_falling_state() {
+        let mut app = setup_merge_app();
+
+        let e1 = spawn_test_fruit(&mut app, FruitType::Cherry);
+        let e2 = spawn_test_fruit(&mut app, FruitType::Cherry);
+
+        app.world_mut().write_message(FruitMergeEvent {
+            entity1: e1,
+            entity2: e2,
+            fruit_type: FruitType::Cherry,
+            position: Vec2::ZERO,
+        });
+
+        app.update();
+
+        // The merged Strawberry should start in Falling state
+        let falling_count = app
+            .world_mut()
+            .query_filtered::<&FruitSpawnState, With<Fruit>>()
+            .iter(app.world())
+            .filter(|&&state| state == FruitSpawnState::Falling)
+            .count();
+
+        assert_eq!(
+            falling_count,
+            1,
+            "Merged fruit should be in Falling state"
+        );
     }
 }
