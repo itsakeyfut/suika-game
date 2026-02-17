@@ -128,18 +128,27 @@ impl Plugin for GameCorePlugin {
     fn build(&self, app: &mut App) {
         info!("GameCorePlugin initialized");
 
+        // Initialize application state
+        app.init_state::<states::AppState>();
+
+        // Initialize game resources
+        app.init_resource::<resources::GameState>()
+            .init_resource::<resources::ComboTimer>()
+            .init_resource::<resources::GameOverTimer>()
+            .init_resource::<resources::NextFruitType>()
+            .init_resource::<systems::input::SpawnPosition>()
+            .init_resource::<systems::input::InputMode>()
+            .init_resource::<systems::input::LastCursorPosition>();
+
         // Register events (Phase 5+)
         app.add_message::<events::FruitMergeEvent>();
 
-        // TODO: Phase 3+ - Register systems and resources
-        // app
-        //     .init_state::<AppState>()
-        //     .init_resource::<GameState>()
-        //     .init_resource::<ComboTimer>()
-        //     .init_resource::<GameOverTimer>()
-        //     .init_resource::<NextFruitType>()
-        //     .add_systems(Startup, setup_systems)
-        //     .add_systems(Update, game_systems);
+        // TODO: Phase 5+ - Register collision and merge systems
+        // app.add_systems(Update, (
+        //     collision::detect_fruit_collision,
+        //     collision::handle_fruit_merge,
+        //     score::update_score_on_merge,
+        // ));
     }
 }
 
@@ -150,6 +159,10 @@ mod tests {
     #[test]
     fn test_plugin_builds() {
         let mut app = App::new();
+        // MinimalPlugins + StatesPlugin are required for GameCorePlugin
+        // (StatesPlugin is needed for init_state, included in DefaultPlugins but not MinimalPlugins)
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(bevy::state::app::StatesPlugin);
         app.add_plugins(GameCorePlugin);
         // Plugin should build without panicking
     }

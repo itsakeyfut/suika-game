@@ -35,17 +35,8 @@ fn main() {
         // This is approximately our target of -980 pixels/s² (configurable in physics.ron)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(AudioPlugin)
-        // Application state
-        .init_state::<AppState>()
-        // Game resources
-        .init_resource::<GameState>()
-        .init_resource::<ComboTimer>()
-        .init_resource::<GameOverTimer>()
-        .init_resource::<NextFruitType>()
-        .init_resource::<SpawnPosition>()
-        .init_resource::<InputMode>()
-        .init_resource::<LastCursorPosition>()
         // Game plugins (internal crates)
+        // Note: GameCorePlugin initializes AppState and all game resources
         .add_plugins(GameAssetsPlugin) // Load assets first
         .add_plugins(GameConfigPlugin) // Load game configuration
         .add_plugins(GameCorePlugin)
