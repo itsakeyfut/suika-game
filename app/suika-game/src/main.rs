@@ -32,7 +32,7 @@ fn main() {
         // External plugins
         // Rapier physics with 100 pixels per meter scaling
         // Default gravity is -9.81 m/s², which equals -981 pixels/s²
-        // This is approximately our target of -980 pixels/s² from constants::physics::GRAVITY
+        // This is approximately our target of -980 pixels/s² (configurable in physics.ron)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(AudioPlugin)
         // Application state
@@ -47,6 +47,7 @@ fn main() {
         .init_resource::<LastCursorPosition>()
         // Game plugins (internal crates)
         .add_plugins(GameAssetsPlugin) // Load assets first
+        .add_plugins(GameConfigPlugin) // Load game configuration
         .add_plugins(GameCorePlugin)
         .add_plugins(GameUIPlugin)
         .add_plugins(GameAudioPlugin)

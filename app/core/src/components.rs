@@ -60,6 +60,20 @@ pub struct Container;
 #[derive(Component, Debug, Clone, Copy, Default)]
 pub struct BottomWall;
 
+/// Left wall marker component
+///
+/// Marks the left wall of the container.
+/// Used to identify and update the left wall during hot-reload.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct LeftWall;
+
+/// Right wall marker component
+///
+/// Marks the right wall of the container.
+/// Used to identify and update the right wall during hot-reload.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct RightWall;
+
 /// Boundary line marker component
 ///
 /// Marks the entity representing the game over boundary line.

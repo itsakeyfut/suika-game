@@ -1,0 +1,116 @@
+// Fruit configuration for Suika Game
+// All 11 fruit types with their physical and gameplay parameters
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Parameters:
+// - name: Fruit type identifier
+// - radius: Collision radius in pixels (affects size and mass)
+// - points: Score awarded when this fruit is created through merging
+// - restitution: Bounciness coefficient (0.0 = no bounce, 1.0 = perfect bounce)
+// - friction: Surface friction coefficient (0.0 = ice, 1.0 = rubber)
+// - mass_multiplier: Multiplier for mass calculation (mass = radius² × mass_multiplier)
+
+FruitsConfig(
+    fruits: [
+        // Stage 1: Cherry (smallest, spawnable)
+        (
+            name: "Cherry",
+            radius: 20.0,
+            points: 10,
+            restitution: 0.3,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 2: Strawberry (spawnable)
+        (
+            name: "Strawberry",
+            radius: 30.0,
+            points: 20,
+            restitution: 0.3,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 3: Grape (spawnable)
+        (
+            name: "Grape",
+            radius: 40.0,
+            points: 40,
+            restitution: 0.3,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 4: Dekopon (spawnable)
+        (
+            name: "Dekopon",
+            radius: 50.0,
+            points: 80,
+            restitution: 0.25,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 5: Persimmon (spawnable)
+        (
+            name: "Persimmon",
+            radius: 60.0,
+            points: 160,
+            restitution: 0.25,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 6: Apple (merge only)
+        (
+            name: "Apple",
+            radius: 70.0,
+            points: 320,
+            restitution: 0.25,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 7: Pear (merge only)
+        (
+            name: "Pear",
+            radius: 80.0,
+            points: 640,
+            restitution: 0.25,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 8: Peach (merge only)
+        (
+            name: "Peach",
+            radius: 90.0,
+            points: 1280,
+            restitution: 0.2,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 9: Pineapple (merge only)
+        (
+            name: "Pineapple",
+            radius: 100.0,
+            points: 2560,
+            restitution: 0.2,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 10: Melon (merge only)
+        (
+            name: "Melon",
+            radius: 110.0,
+            points: 5120,
+            restitution: 0.2,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+        // Stage 11: Watermelon (largest, merge only)
+        (
+            name: "Watermelon",
+            radius: 120.0,
+            points: 10240,
+            restitution: 0.2,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+        ),
+    ],
+)

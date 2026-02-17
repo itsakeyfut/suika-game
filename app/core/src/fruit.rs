@@ -3,6 +3,7 @@
 //! This module defines the fruit evolution system with 11 fruit types,
 //! from Cherry (smallest) to Watermelon (largest).
 
+use crate::config::FruitsConfig;
 use bevy::prelude::*;
 
 /// Represents the 11 fruit types in the evolution chain
@@ -73,48 +74,44 @@ impl FruitType {
         }
     }
 
-    /// Returns the physical and game parameters for this fruit type
+    /// Returns the physical and game parameters for this fruit type from RON config
     ///
-    /// Parameters are based on the fruit size progression:
-    /// - Radius: 20px to 120px (increments of 10px)
-    /// - Points: 10 to 10240 (doubles each stage)
-    /// - Mass: calculated from radius squared
-    /// - Restitution: decreases slightly with size (more bounce for small fruits)
-    /// - Friction: constant across all fruits
-    pub fn parameters(&self) -> FruitParams {
-        let (radius, points) = match self {
-            FruitType::Cherry => (20.0, 10),
-            FruitType::Strawberry => (30.0, 20),
-            FruitType::Grape => (40.0, 40),
-            FruitType::Dekopon => (50.0, 80),
-            FruitType::Persimmon => (60.0, 160),
-            FruitType::Apple => (70.0, 320),
-            FruitType::Pear => (80.0, 640),
-            FruitType::Peach => (90.0, 1280),
-            FruitType::Pineapple => (100.0, 2560),
-            FruitType::Melon => (110.0, 5120),
-            FruitType::Watermelon => (120.0, 10240),
-        };
+    /// This method reads parameters from the externalized RON configuration,
+    /// allowing hot-reload of fruit parameters during gameplay.
+    ///
+    /// Returns `None` if the config doesn't contain an entry for this fruit type.
+    /// This can happen during hot-reload if the RON file is temporarily invalid.
+    pub fn try_parameters_from_config(&self, config: &FruitsConfig) -> Option<FruitParams> {
+        let index = *self as usize;
+        let entry = config.fruits.get(index)?;
 
-        // Mass is proportional to radius squared (approximating 2D area)
-        let mass = radius * radius * 0.01;
+        // Calculate mass from radius and mass_multiplier
+        let mass = entry.radius * entry.radius * entry.mass_multiplier;
 
-        // Smaller fruits are slightly bouncier
-        let restitution = match self {
-            FruitType::Cherry | FruitType::Strawberry | FruitType::Grape => 0.3,
-            FruitType::Dekopon | FruitType::Persimmon | FruitType::Apple | FruitType::Pear => 0.25,
-            FruitType::Peach | FruitType::Pineapple | FruitType::Melon | FruitType::Watermelon => {
-                0.2
-            }
-        };
-
-        FruitParams {
-            radius,
+        Some(FruitParams {
+            radius: entry.radius,
             mass,
-            restitution,
-            friction: 0.5, // Constant friction for all fruits
-            points,
-        }
+            restitution: entry.restitution,
+            friction: entry.friction,
+            points: entry.points,
+        })
+    }
+
+    /// Returns the physical and game parameters for this fruit type from RON config
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fruit config doesn't contain data for this fruit type.
+    /// Use `try_parameters_from_config` for graceful error handling during hot-reload.
+    pub fn parameters_from_config(&self, config: &FruitsConfig) -> FruitParams {
+        self.try_parameters_from_config(config).unwrap_or_else(|| {
+            panic!(
+                "FruitsConfig missing entry for {:?} (index {}). Expected at least {} entries.",
+                self,
+                *self as usize,
+                (*self as usize) + 1
+            )
+        })
     }
 
     /// Returns the array of fruits that can be spawned by the player
@@ -182,65 +179,6 @@ mod tests {
         assert_eq!(spawnable[2], FruitType::Grape);
         assert_eq!(spawnable[3], FruitType::Dekopon);
         assert_eq!(spawnable[4], FruitType::Persimmon);
-    }
-
-    #[test]
-    fn test_fruit_parameters_radius() {
-        // Test that radii increase by 10px per stage
-        assert_eq!(FruitType::Cherry.parameters().radius, 20.0);
-        assert_eq!(FruitType::Strawberry.parameters().radius, 30.0);
-        assert_eq!(FruitType::Grape.parameters().radius, 40.0);
-        assert_eq!(FruitType::Dekopon.parameters().radius, 50.0);
-        assert_eq!(FruitType::Persimmon.parameters().radius, 60.0);
-        assert_eq!(FruitType::Apple.parameters().radius, 70.0);
-        assert_eq!(FruitType::Pear.parameters().radius, 80.0);
-        assert_eq!(FruitType::Peach.parameters().radius, 90.0);
-        assert_eq!(FruitType::Pineapple.parameters().radius, 100.0);
-        assert_eq!(FruitType::Melon.parameters().radius, 110.0);
-        assert_eq!(FruitType::Watermelon.parameters().radius, 120.0);
-    }
-
-    #[test]
-    fn test_fruit_parameters_points() {
-        // Test that points double each stage
-        assert_eq!(FruitType::Cherry.parameters().points, 10);
-        assert_eq!(FruitType::Strawberry.parameters().points, 20);
-        assert_eq!(FruitType::Grape.parameters().points, 40);
-        assert_eq!(FruitType::Dekopon.parameters().points, 80);
-        assert_eq!(FruitType::Persimmon.parameters().points, 160);
-        assert_eq!(FruitType::Apple.parameters().points, 320);
-        assert_eq!(FruitType::Pear.parameters().points, 640);
-        assert_eq!(FruitType::Peach.parameters().points, 1280);
-        assert_eq!(FruitType::Pineapple.parameters().points, 2560);
-        assert_eq!(FruitType::Melon.parameters().points, 5120);
-        assert_eq!(FruitType::Watermelon.parameters().points, 10240);
-    }
-
-    #[test]
-    fn test_fruit_parameters_mass() {
-        // Test that mass increases with radius squared
-        let cherry_params = FruitType::Cherry.parameters();
-        let watermelon_params = FruitType::Watermelon.parameters();
-
-        // Mass should be proportional to radius squared
-        assert_eq!(cherry_params.mass, 20.0 * 20.0 * 0.01);
-        assert_eq!(watermelon_params.mass, 120.0 * 120.0 * 0.01);
-        assert!(watermelon_params.mass > cherry_params.mass);
-    }
-
-    #[test]
-    fn test_fruit_parameters_restitution() {
-        // Test that small fruits are bouncier
-        assert_eq!(FruitType::Cherry.parameters().restitution, 0.3);
-        assert_eq!(FruitType::Apple.parameters().restitution, 0.25);
-        assert_eq!(FruitType::Watermelon.parameters().restitution, 0.2);
-    }
-
-    #[test]
-    fn test_fruit_parameters_friction() {
-        // Test that friction is constant for all fruits
-        assert_eq!(FruitType::Cherry.parameters().friction, 0.5);
-        assert_eq!(FruitType::Watermelon.parameters().friction, 0.5);
     }
 
     #[test]

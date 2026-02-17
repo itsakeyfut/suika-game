@@ -6,7 +6,10 @@
 use bevy::prelude::*;
 
 use crate::components::{Fruit, FruitSpawnState, NextFruitPreview};
-use crate::constants::physics;
+use crate::config::{
+    FruitsConfig, FruitsConfigHandle, GameRulesConfig, GameRulesConfigHandle, PhysicsConfig,
+    PhysicsConfigHandle,
+};
 use crate::resources::NextFruitType;
 
 /// Sets up the next fruit preview display
@@ -26,19 +29,64 @@ use crate::resources::NextFruitType;
 /// # Note
 ///
 /// This system should run during Startup to create the initial preview entity.
-pub fn setup_fruit_preview(mut commands: Commands, next_fruit: Res<NextFruitType>) {
-    let params = next_fruit.get().parameters();
+#[allow(clippy::too_many_arguments)]
+pub fn setup_fruit_preview(
+    mut commands: Commands,
+    next_fruit: Res<NextFruitType>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    physics_config_handle: Res<PhysicsConfigHandle>,
+    physics_config_assets: Res<Assets<PhysicsConfig>>,
+    game_rules_handle: Res<GameRulesConfigHandle>,
+    game_rules_assets: Res<Assets<GameRulesConfig>>,
+) {
+    // Get the configs
+    let radius = if let Some(config) = fruits_config_assets.get(&fruits_config_handle.0) {
+        next_fruit
+            .get()
+            .try_parameters_from_config(config)
+            .map(|p| p.radius)
+            .unwrap_or_else(|| {
+                warn!(
+                    "⚠️ No config entry for fruit {:?}, using default radius",
+                    next_fruit.get()
+                );
+                20.0
+            })
+    } else {
+        warn!("Fruits config not loaded yet, using default radius for preview");
+        20.0 // Default to smallest fruit
+    };
 
-    // Preview position: fixed position on the right side of the screen
-    // Positioned to the right of the container with some margin
-    let preview_x = physics::CONTAINER_WIDTH / 2.0 + 120.0;
-    let preview_y = physics::CONTAINER_HEIGHT / 2.0 - 100.0; // Upper area
+    // Get preview position and scale from game rules config
+    let (preview_x_offset, preview_y_offset, preview_scale) =
+        if let Some(rules) = game_rules_assets.get(&game_rules_handle.0) {
+            (
+                rules.preview_x_offset,
+                rules.preview_y_offset,
+                rules.preview_scale,
+            )
+        } else {
+            (120.0, -100.0, 1.5) // Fallback defaults
+        };
+
+    // Get container dimensions from physics config
+    let (container_width, container_height) =
+        if let Some(physics) = physics_config_assets.get(&physics_config_handle.0) {
+            (physics.container_width, physics.container_height)
+        } else {
+            (600.0, 800.0) // Fallback defaults
+        };
+
+    // Preview position: positioned relative to container
+    let preview_x = container_width / 2.0 + preview_x_offset;
+    let preview_y = container_height / 2.0 + preview_y_offset;
 
     commands.spawn((
         NextFruitPreview,
         Sprite {
             color: next_fruit.get().placeholder_color(),
-            custom_size: Some(Vec2::splat(params.radius * 1.5)),
+            custom_size: Some(Vec2::splat(radius * 2.0 * preview_scale)),
             ..default()
         },
         Transform::from_xyz(preview_x, preview_y, 10.0),
@@ -75,7 +123,14 @@ pub fn update_fruit_preview(
     mut preview_query: Query<(&mut Sprite, &mut Visibility), With<NextFruitPreview>>,
     next_fruit: Res<NextFruitType>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
+    fruits_config_handle: Res<FruitsConfigHandle>,
+    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    game_rules_handle: Res<GameRulesConfigHandle>,
+    game_rules_assets: Res<Assets<GameRulesConfig>>,
 ) {
+    // Get the configs
+    let fruits_config = fruits_config_assets.get(&fruits_config_handle.0);
+    let game_rules = game_rules_assets.get(&game_rules_handle.0);
     // Check if there's a held or falling fruit
     let has_held_fruit = fruit_states
         .iter()
@@ -101,9 +156,18 @@ pub fn update_fruit_preview(
 
         // Update preview when next fruit type changes
         if next_fruit.is_changed() {
-            let params = next_fruit.get().parameters();
             sprite.color = next_fruit.get().placeholder_color();
-            sprite.custom_size = Some(Vec2::splat(params.radius * 1.5));
+            if let Some(fruits_cfg) = fruits_config {
+                let preview_scale = game_rules.map(|r| r.preview_scale).unwrap_or(1.5);
+                if let Some(params) = next_fruit.get().try_parameters_from_config(fruits_cfg) {
+                    sprite.custom_size = Some(Vec2::splat(params.radius * 2.0 * preview_scale));
+                } else {
+                    warn!(
+                        "⚠️ No config entry for preview fruit {:?}, keeping previous size",
+                        next_fruit.get()
+                    );
+                }
+            }
         }
     }
 }
@@ -111,12 +175,153 @@ pub fn update_fruit_preview(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::*;
+    use bevy::asset::Assets;
+
+    /// Helper to setup test app with required resources
+    fn setup_test_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+
+        // Create and add config assets
+        let mut fruits_assets = Assets::<FruitsConfig>::default();
+        let fruits_config = FruitsConfig {
+            fruits: vec![
+                FruitConfigEntry {
+                    name: "Cherry".to_string(),
+                    radius: 20.0,
+                    points: 10,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Strawberry".to_string(),
+                    radius: 30.0,
+                    points: 20,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Grape".to_string(),
+                    radius: 40.0,
+                    points: 40,
+                    restitution: 0.3,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Dekopon".to_string(),
+                    radius: 50.0,
+                    points: 80,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Persimmon".to_string(),
+                    radius: 60.0,
+                    points: 160,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Apple".to_string(),
+                    radius: 70.0,
+                    points: 320,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Pear".to_string(),
+                    radius: 80.0,
+                    points: 640,
+                    restitution: 0.25,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Peach".to_string(),
+                    radius: 90.0,
+                    points: 1280,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Pineapple".to_string(),
+                    radius: 100.0,
+                    points: 2560,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Melon".to_string(),
+                    radius: 110.0,
+                    points: 5120,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+                FruitConfigEntry {
+                    name: "Watermelon".to_string(),
+                    radius: 120.0,
+                    points: 10240,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    mass_multiplier: 0.01,
+                },
+            ],
+        };
+        let fruits_handle = fruits_assets.add(fruits_config);
+
+        let mut physics_assets = Assets::<PhysicsConfig>::default();
+        let physics_config = PhysicsConfig {
+            gravity: -980.0,
+            container_width: 600.0,
+            container_height: 800.0,
+            wall_thickness: 20.0,
+            boundary_line_y: 300.0,
+            wall_restitution: 0.2,
+            wall_friction: 0.5,
+            fruit_spawn_y_offset: 50.0,
+            fruit_linear_damping: 0.5,
+            fruit_angular_damping: 1.0,
+            keyboard_move_speed: 300.0,
+        };
+        let physics_handle = physics_assets.add(physics_config);
+
+        let mut game_rules_assets = Assets::<GameRulesConfig>::default();
+        let game_rules_config = GameRulesConfig {
+            spawnable_fruit_count: 5,
+            combo_window: 2.0,
+            combo_max: 10,
+            game_over_timer: 3.0,
+            combo_bonuses: std::collections::HashMap::new(),
+            preview_x_offset: 120.0,
+            preview_y_offset: -100.0,
+            preview_scale: 1.5,
+        };
+        let game_rules_handle = game_rules_assets.add(game_rules_config);
+
+        app.insert_resource(fruits_assets);
+        app.insert_resource(FruitsConfigHandle(fruits_handle));
+        app.insert_resource(physics_assets);
+        app.insert_resource(PhysicsConfigHandle(physics_handle));
+        app.insert_resource(game_rules_assets);
+        app.insert_resource(GameRulesConfigHandle(game_rules_handle));
+        app.init_resource::<NextFruitType>();
+
+        app
+    }
 
     #[test]
     fn test_setup_fruit_preview_creates_entity() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_fruit_preview);
 
         app.update();
@@ -133,9 +338,7 @@ mod tests {
 
     #[test]
     fn test_setup_fruit_preview_has_correct_components() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_fruit_preview);
 
         app.update();
@@ -170,9 +373,7 @@ mod tests {
 
     #[test]
     fn test_preview_has_fixed_position() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_fruit_preview);
         app.add_systems(Update, update_fruit_preview);
 
@@ -214,9 +415,7 @@ mod tests {
     fn test_update_fruit_preview_updates_on_type_change() {
         use crate::fruit::FruitType;
 
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_fruit_preview);
         app.add_systems(Update, update_fruit_preview);
 
@@ -255,9 +454,7 @@ mod tests {
 
     #[test]
     fn test_preview_position_is_on_right_side() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_fruit_preview);
 
         app.update();
@@ -270,7 +467,7 @@ mod tests {
             .unwrap();
 
         // Verify preview is positioned to the right of the container
-        let expected_x = physics::CONTAINER_WIDTH / 2.0 + 120.0;
+        let expected_x = 600.0 / 2.0 + 120.0; // Default container width
         assert_eq!(
             transform.translation.x, expected_x,
             "Preview should be positioned on the right side"
@@ -287,9 +484,7 @@ mod tests {
     fn test_preview_visibility_based_on_held_fruit() {
         use crate::fruit::FruitType;
 
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.init_resource::<NextFruitType>();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_fruit_preview);
         app.add_systems(Update, update_fruit_preview);
 

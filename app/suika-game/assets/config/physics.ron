@@ -1,0 +1,44 @@
+// Physics configuration for Suika Game
+// Controls gravity, container dimensions, and physics simulation parameters
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Parameters:
+// - gravity: Acceleration in pixels/s² (negative = downward)
+// - container_width: Playable area width in pixels
+// - container_height: Playable area height in pixels
+// - wall_thickness: Thickness of container walls in pixels
+// - boundary_line_y: Y position of game over line (from bottom)
+// - wall_restitution: Bounciness of walls (0.0 = no bounce, 1.0 = perfect bounce)
+// - wall_friction: Surface friction of walls (0.0 = ice, 1.0 = rubber)
+// - fruit_spawn_y_offset: Distance from top to spawn held fruit
+// - fruit_linear_damping: Reduces fruit linear velocity over time
+// - fruit_angular_damping: Reduces fruit rotation over time
+// - move_speed: Keyboard movement speed in pixels/second
+
+PhysicsConfig(
+    // Gravity (standard is -980.0 for realistic falling)
+    gravity: -980.0,
+
+    // Container dimensions
+    container_width: 600.0,
+    container_height: 800.0,
+    wall_thickness: 20.0,
+
+    // Game over line (fruits above this line trigger timer)
+    boundary_line_y: 300.0,
+
+    // Wall physics properties
+    wall_restitution: 0.2,
+    wall_friction: 0.5,
+
+    // Fruit spawning
+    fruit_spawn_y_offset: 50.0,
+
+    // Fruit physics damping
+    fruit_linear_damping: 0.5,
+    fruit_angular_damping: 1.0,
+
+    // Player input
+    keyboard_move_speed: 300.0,
+)

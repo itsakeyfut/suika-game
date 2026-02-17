@@ -39,6 +39,7 @@ use bevy::prelude::*;
 
 // Module declarations
 pub mod components;
+pub mod config;
 pub mod constants;
 pub mod fruit;
 pub mod persistence;
@@ -55,8 +56,8 @@ pub mod prelude {
 
     // Components
     pub use crate::components::{
-        BottomWall, BoundaryLine, Container, Dropping, Fruit, FruitSpawnState, MergeCandidate,
-        NextFruitPreview,
+        BottomWall, BoundaryLine, Container, Dropping, Fruit, FruitSpawnState, LeftWall,
+        MergeCandidate, NextFruitPreview, RightWall,
     };
 
     // Fruit system
@@ -77,6 +78,12 @@ pub mod prelude {
 
     // Systems
     pub use crate::systems;
+
+    // Config
+    pub use crate::config::{
+        FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin, GameRulesConfig,
+        GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle,
+    };
 
     // Plugin
     pub use crate::GameCorePlugin;

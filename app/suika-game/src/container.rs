@@ -24,14 +24,28 @@ use suika_game_core::prelude::*;
 ///
 /// # Container Dimensions
 ///
-/// Based on `constants::physics`:
-/// - Width: 600 pixels
-/// - Height: 800 pixels
-/// - Wall thickness: 20 pixels
-pub fn setup_container(mut commands: Commands) {
-    let container_width = constants::physics::CONTAINER_WIDTH;
-    let container_height = constants::physics::CONTAINER_HEIGHT;
-    let wall_thickness = constants::physics::WALL_THICKNESS;
+/// Loaded from `PhysicsConfig`:
+/// - Width, height, wall thickness from physics.ron
+/// - Wall restitution and friction from config
+pub fn setup_container(
+    mut commands: Commands,
+    physics_handle: Res<PhysicsConfigHandle>,
+    physics_assets: Res<Assets<PhysicsConfig>>,
+) {
+    // Get physics config, fallback to defaults if not loaded yet
+    let (container_width, container_height, wall_thickness, wall_restitution, wall_friction) =
+        if let Some(config) = physics_assets.get(&physics_handle.0) {
+            (
+                config.container_width,
+                config.container_height,
+                config.wall_thickness,
+                config.wall_restitution,
+                config.wall_friction,
+            )
+        } else {
+            warn!("Physics config not loaded yet, using fallback values");
+            (600.0, 800.0, 20.0, 0.2, 0.5)
+        };
 
     // Calculate wall positions
     let half_width = container_width / 2.0;
@@ -40,11 +54,12 @@ pub fn setup_container(mut commands: Commands) {
     // Left wall
     commands.spawn((
         Container,
+        LeftWall, // Marker for hot-reload wall identification
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
-        Friction::coefficient(0.5),
+        Friction::coefficient(wall_friction),
         Restitution {
-            coefficient: 0.3,
+            coefficient: wall_restitution,
             combine_rule: CoefficientCombineRule::Min,
         },
         ActiveEvents::COLLISION_EVENTS,
@@ -59,11 +74,12 @@ pub fn setup_container(mut commands: Commands) {
     // Right wall
     commands.spawn((
         Container,
+        RightWall, // Marker for hot-reload wall identification
         RigidBody::Fixed,
         Collider::cuboid(wall_thickness / 2.0, half_height),
-        Friction::coefficient(0.5),
+        Friction::coefficient(wall_friction),
         Restitution {
-            coefficient: 0.3,
+            coefficient: wall_restitution,
             combine_rule: CoefficientCombineRule::Min,
         },
         ActiveEvents::COLLISION_EVENTS,
@@ -81,7 +97,7 @@ pub fn setup_container(mut commands: Commands) {
         BottomWall, // Marker for landing detection
         RigidBody::Fixed,
         Collider::cuboid(half_width + wall_thickness, wall_thickness / 2.0),
-        Friction::coefficient(0.5),
+        Friction::coefficient(wall_friction),
         Restitution {
             coefficient: 0.0, // No bounce on ground
             combine_rule: CoefficientCombineRule::Min,
@@ -99,7 +115,11 @@ pub fn setup_container(mut commands: Commands) {
     ));
 
     // Boundary line (game over line) - visual only, no physics
-    let boundary_y = constants::physics::BOUNDARY_LINE_Y;
+    let boundary_y = if let Some(config) = physics_assets.get(&physics_handle.0) {
+        config.boundary_line_y
+    } else {
+        300.0 // Fallback
+    };
     let line_thickness = 3.0;
 
     commands.spawn((
@@ -119,9 +139,36 @@ pub fn setup_container(mut commands: Commands) {
 mod tests {
     use super::*;
 
+    /// Helper to create a test app with necessary resources
+    fn setup_test_app() -> App {
+        let mut app = App::new();
+
+        // Add required resources for setup_container
+        let mut physics_assets = Assets::<PhysicsConfig>::default();
+        let physics_config = PhysicsConfig {
+            gravity: -980.0,
+            container_width: 600.0,
+            container_height: 800.0,
+            wall_thickness: 20.0,
+            boundary_line_y: 300.0,
+            wall_restitution: 0.2,
+            wall_friction: 0.5,
+            fruit_spawn_y_offset: 50.0,
+            fruit_linear_damping: 0.5,
+            fruit_angular_damping: 1.0,
+            keyboard_move_speed: 300.0,
+        };
+        let handle = physics_assets.add(physics_config);
+
+        app.insert_resource(physics_assets);
+        app.insert_resource(PhysicsConfigHandle(handle));
+
+        app
+    }
+
     #[test]
     fn test_container_setup() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -133,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_container_rigid_bodies() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -149,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_container_colliders() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -161,7 +208,7 @@ mod tests {
 
     #[test]
     fn test_container_friction() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -174,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_container_restitution() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -187,15 +234,15 @@ mod tests {
                 // Bottom wall should have no bounce
                 assert_eq!(restitution.coefficient, 0.0);
             } else {
-                // Side walls should have some bounce
-                assert_eq!(restitution.coefficient, 0.3);
+                // Side walls should have some bounce (from physics.ron)
+                assert_eq!(restitution.coefficient, 0.2);
             }
         }
     }
 
     #[test]
     fn test_container_sprites() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -207,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_boundary_line_exists() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -219,24 +266,24 @@ mod tests {
 
     #[test]
     fn test_boundary_line_position() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
-        // Verify boundary line Y position
+        // Verify boundary line Y position (default from fallback)
         let mut query = app.world_mut().query::<(&BoundaryLine, &Transform)>();
         for (_, transform) in query.iter(app.world()) {
+            // Using fallback value 300.0 since PhysicsConfig not loaded in test
             assert_eq!(
-                transform.translation.y,
-                constants::physics::BOUNDARY_LINE_Y,
-                "Boundary line should be at BOUNDARY_LINE_Y"
+                transform.translation.y, 300.0,
+                "Boundary line should be at default position"
             );
         }
     }
 
     #[test]
     fn test_boundary_line_no_physics() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
@@ -259,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_boundary_line_sprite() {
-        let mut app = App::new();
+        let mut app = setup_test_app();
         app.add_systems(Startup, setup_container);
         app.update();
 
