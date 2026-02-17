@@ -11,8 +11,9 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::ActiveEvents;
 
 use crate::components::FruitSpawnState;
-use crate::config::{FruitsConfig, FruitsConfigHandle};
+use crate::config::{BounceConfig, BounceConfigHandle, FruitsConfig, FruitsConfigHandle};
 use crate::events::FruitMergeEvent;
+use crate::systems::effects::bounce::SquashStretchAnimation;
 use crate::systems::spawn::spawn_fruit;
 
 /// Processes `FruitMergeEvent` and performs the actual fruit merge
@@ -37,12 +38,19 @@ pub fn handle_fruit_merge(
     mut merge_events: MessageReader<FruitMergeEvent>,
     fruits_handle: Res<FruitsConfigHandle>,
     fruits_assets: Res<Assets<FruitsConfig>>,
+    bounce_handle: Option<Res<BounceConfigHandle>>,
+    bounce_assets: Option<Res<Assets<BounceConfig>>>,
 ) {
     let Some(fruits_config) = fruits_assets.get(&fruits_handle.0) else {
         // Drain events to prevent stale buffering
         for _ in merge_events.read() {}
         return;
     };
+
+    let bounce_config = bounce_handle
+        .as_ref()
+        .zip(bounce_assets.as_ref())
+        .and_then(|(h, a)| a.get(&h.0));
 
     let mut despawned: HashSet<Entity> = HashSet::new();
 
@@ -66,11 +74,12 @@ pub fn handle_fruit_merge(
         if let Some(next_type) = event.fruit_type.next() {
             let entity = spawn_fruit(&mut commands, next_type, event.position, fruits_config);
 
-            // Add components required for the fruit to participate in collision detection
+            // Add components required for collision detection and the pop-in animation
             commands.entity(entity).insert((
                 next_type,
                 FruitSpawnState::Falling,
                 ActiveEvents::COLLISION_EVENTS,
+                SquashStretchAnimation::for_merge(bounce_config),
             ));
 
             info!(

@@ -1,0 +1,34 @@
+// Bounce (Squash & Stretch) effect configuration
+// Controls the spring animation played on fruit merge and landing.
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// SpawnIn mode (merge): fruit scales 0→1 with spring overshoot
+//   merge_amplitude    - Spring oscillation amplitude (0.0 = no bounce, 1.0 = extreme)
+//   merge_frequency    - Oscillation frequency in rad/s (higher = faster wobble)
+//   merge_damping      - Damping coefficient (higher = settles faster)
+//
+// Impact mode (landing): fruit squashes and recovers at scale 1
+//   landing_amplitude  - Squash depth (0.0 = no squash)
+//   landing_frequency  - Oscillation frequency in rad/s
+//   landing_damping    - Damping coefficient
+//
+// Settle threshold:
+//   settle_threshold   - Deformation magnitude below which animation is considered done
+//   settle_min_elapsed - Minimum time (s) before settle check activates
+
+BounceConfig(
+    // Merge spawn-in: satisfying elastic pop
+    merge_amplitude: 0.3,
+    merge_frequency: 18.0,
+    merge_damping: 6.0,
+
+    // Landing impact: quick squash and recover
+    landing_amplitude: 0.18,
+    landing_frequency: 22.0,
+    landing_damping: 9.0,
+
+    // Settle condition
+    settle_threshold: 0.01,
+    settle_min_elapsed: 0.3,
+)

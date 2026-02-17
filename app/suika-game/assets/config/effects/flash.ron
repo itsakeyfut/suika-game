@@ -1,0 +1,27 @@
+// Flash visual effect configuration
+// Controls the local flash (at merge point) and optional full-screen flash.
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Local flash (spawned for every merge):
+//   local_duration        - How long the flash lasts (s)
+//   local_initial_alpha   - Starting opacity (0.0 = transparent, 1.0 = opaque)
+//   local_size_multiplier - Initial sprite size = fruit_radius × this value
+//
+// Screen flash (only for large-fruit merges):
+//   screen_duration        - How long the screen flash lasts (s)
+//   screen_initial_alpha   - Starting opacity for the screen overlay
+//   screen_flash_min_index - Minimum fruit index (0-based) that triggers screen flash
+//                            0=Cherry, 8=Pineapple, 9=Melon, 10=Watermelon
+
+FlashConfig(
+    // Local flash
+    local_duration: 0.3,
+    local_initial_alpha: 0.6,
+    local_size_multiplier: 2.5,
+
+    // Screen flash
+    screen_duration: 0.25,
+    screen_initial_alpha: 0.35,
+    screen_flash_min_index: 8,
+)
