@@ -30,6 +30,7 @@
 //!
 //! - [`components`]: ECS components for game entities
 //! - [`constants`]: Game configuration constants
+//! - [`events`]: Custom game events for event-driven architecture
 //! - [`fruit`]: Fruit type definitions and parameters
 //! - [`persistence`]: Highscore save/load functionality
 //! - [`resources`]: Bevy resources for game state
@@ -41,6 +42,7 @@ use bevy::prelude::*;
 pub mod components;
 pub mod config;
 pub mod constants;
+pub mod events;
 pub mod fruit;
 pub mod persistence;
 pub mod resources;
@@ -85,6 +87,9 @@ pub mod prelude {
         GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle,
     };
 
+    // Events
+    pub use crate::events::FruitMergeEvent;
+
     // Plugin
     pub use crate::GameCorePlugin;
 }
@@ -120,8 +125,11 @@ pub mod prelude {
 pub struct GameCorePlugin;
 
 impl Plugin for GameCorePlugin {
-    fn build(&self, _app: &mut App) {
+    fn build(&self, app: &mut App) {
         info!("GameCorePlugin initialized");
+
+        // Register events (Phase 5+)
+        app.add_message::<events::FruitMergeEvent>();
 
         // TODO: Phase 3+ - Register systems and resources
         // app
