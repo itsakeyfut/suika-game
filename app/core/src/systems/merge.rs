@@ -173,8 +173,7 @@ mod tests {
             .count();
 
         assert_eq!(
-            strawberry_count,
-            1,
+            strawberry_count, 1,
             "Merging two cherries should spawn exactly one strawberry"
         );
     }
@@ -249,8 +248,7 @@ mod tests {
             .count();
 
         assert_eq!(
-            strawberry_count,
-            1,
+            strawberry_count, 1,
             "Duplicate events sharing an entity should produce only one merged fruit"
         );
     }
@@ -279,10 +277,6 @@ mod tests {
             .filter(|&&state| state == FruitSpawnState::Falling)
             .count();
 
-        assert_eq!(
-            falling_count,
-            1,
-            "Merged fruit should be in Falling state"
-        );
+        assert_eq!(falling_count, 1, "Merged fruit should be in Falling state");
     }
 }
