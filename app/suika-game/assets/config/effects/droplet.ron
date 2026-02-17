@@ -1,0 +1,46 @@
+// Water droplet particle effect configuration
+// Controls the splash particles emitted on fruit merge and landing.
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Spawn counts:
+//   count_merge   - Number of droplets spawned on a fruit merge
+//   count_landing - Number of droplets spawned when a fruit lands
+//
+// Visual:
+//   radius        - Droplet sprite radius in pixels
+//   color         - RGBA color of droplets (r, g, b, a each 0.0–1.0)
+//
+// Velocity:
+//   min_speed     - Minimum initial speed (pixels/s)
+//   max_speed     - Maximum initial speed (pixels/s)
+//
+// Lifetime:
+//   lifetime_min  - Minimum time (s) before a droplet disappears
+//   lifetime_max  - Maximum time (s) before a droplet disappears
+//
+// Physics:
+//   gravity       - Downward acceleration (pixels/s²), negative = downward
+//   bounce_damping - Speed multiplier applied after each wall bounce (0.0–1.0)
+
+DropletConfig(
+    // Spawn counts
+    count_merge: 12,
+    count_landing: 5,
+
+    // Visual
+    radius: 2.5,
+    color: (r: 0.5, g: 0.78, b: 0.95, a: 0.85),
+
+    // Velocity
+    min_speed: 80.0,
+    max_speed: 350.0,
+
+    // Lifetime
+    lifetime_min: 0.4,
+    lifetime_max: 0.9,
+
+    // Physics
+    gravity: -600.0,
+    bounce_damping: 0.55,
+)

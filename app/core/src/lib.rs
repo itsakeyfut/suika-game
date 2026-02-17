@@ -83,8 +83,9 @@ pub mod prelude {
 
     // Config
     pub use crate::config::{
-        FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin, GameRulesConfig,
-        GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle,
+        BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, FlashConfig,
+        FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin,
+        GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle, RonColor,
     };
 
     // Events
@@ -95,6 +96,12 @@ pub mod prelude {
 
     // Score
     pub use crate::systems::score::combo_multiplier;
+
+    // Effects
+    pub use crate::systems::effects::MergeAnimation;
+    pub use crate::systems::effects::bounce::SquashStretchAnimation;
+    pub use crate::systems::effects::droplet::WaterDroplet;
+    pub use crate::systems::effects::flash::{LocalFlashAnimation, ScreenFlashAnimation};
 
     // Plugin
     pub use crate::GameCorePlugin;
@@ -171,6 +178,41 @@ impl Plugin for GameCorePlugin {
         app.add_systems(
             Update,
             systems::score::tick_combo_timer.after(systems::score::update_score_on_merge),
+        );
+
+        // Merge animation (runs after merge so newly spawned fruits are animated)
+        app.add_systems(
+            Update,
+            systems::effects::animate_merge_scale.after(systems::merge::handle_fruit_merge),
+        );
+
+        // Squash-and-stretch bounce (SpawnIn from merge + Impact from landing)
+        app.add_systems(
+            Update,
+            systems::effects::bounce::animate_squash_stretch
+                .after(systems::merge::handle_fruit_merge),
+        );
+
+        // Water droplet particles: spawn on merge, spawn on landing, update physics
+        app.add_systems(
+            Update,
+            (
+                systems::effects::droplet::spawn_merge_droplets
+                    .after(systems::merge::handle_fruit_merge),
+                systems::effects::droplet::spawn_landing_droplets,
+                systems::effects::droplet::update_water_droplets,
+            ),
+        );
+
+        // Flash effects: spawn on merge, animate local and screen flashes
+        app.add_systems(
+            Update,
+            (
+                systems::effects::flash::spawn_merge_flash
+                    .after(systems::merge::handle_fruit_merge),
+                systems::effects::flash::animate_local_flash,
+                systems::effects::flash::animate_screen_flash,
+            ),
         );
     }
 }

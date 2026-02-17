@@ -125,6 +125,112 @@ pub struct GameRulesConfig {
 #[derive(Resource)]
 pub struct GameRulesConfigHandle(pub Handle<GameRulesConfig>);
 
+// ---------------------------------------------------------------------------
+// Effect configs
+// ---------------------------------------------------------------------------
+
+/// RGBA color value for use in RON configuration files
+///
+/// `bevy::prelude::Color` does not implement `Deserialize`, so effect configs
+/// use this lightweight struct and convert via `Into<Color>`.
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub struct RonColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl From<RonColor> for bevy::prelude::Color {
+    fn from(c: RonColor) -> Self {
+        bevy::prelude::Color::srgba(c.r, c.g, c.b, c.a)
+    }
+}
+
+/// Bounce (Squash & Stretch) animation configuration
+///
+/// Loaded from `assets/config/effects/bounce.ron`.
+/// Controls the spring parameters for merge spawn-in and landing impact animations.
+#[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+pub struct BounceConfig {
+    /// Spring amplitude for merge spawn-in mode
+    pub merge_amplitude: f32,
+    /// Spring frequency (rad/s) for merge spawn-in mode
+    pub merge_frequency: f32,
+    /// Damping coefficient for merge spawn-in mode
+    pub merge_damping: f32,
+    /// Spring amplitude for landing impact mode
+    pub landing_amplitude: f32,
+    /// Spring frequency (rad/s) for landing impact mode
+    pub landing_frequency: f32,
+    /// Damping coefficient for landing impact mode
+    pub landing_damping: f32,
+    /// Deformation magnitude below which the animation is considered settled
+    pub settle_threshold: f32,
+    /// Minimum elapsed time (s) before the settle check activates
+    pub settle_min_elapsed: f32,
+}
+
+/// Resource holding the handle to the loaded bounce configuration
+#[derive(Resource)]
+pub struct BounceConfigHandle(pub Handle<BounceConfig>);
+
+/// Water droplet particle effect configuration
+///
+/// Loaded from `assets/config/effects/droplet.ron`.
+/// Controls spawn counts, velocity, lifetime, physics, and color of droplets.
+#[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+pub struct DropletConfig {
+    /// Number of droplets spawned on a fruit merge
+    pub count_merge: u32,
+    /// Number of droplets spawned when a fruit lands
+    pub count_landing: u32,
+    /// Visual radius of each droplet in pixels
+    pub radius: f32,
+    /// RGBA color of droplets
+    pub color: RonColor,
+    /// Minimum initial speed in pixels/second
+    pub min_speed: f32,
+    /// Maximum initial speed in pixels/second
+    pub max_speed: f32,
+    /// Minimum droplet lifetime in seconds
+    pub lifetime_min: f32,
+    /// Maximum droplet lifetime in seconds
+    pub lifetime_max: f32,
+    /// Gravity applied to droplets (pixels/s², negative = downward)
+    pub gravity: f32,
+    /// Speed multiplier applied after each wall bounce
+    pub bounce_damping: f32,
+}
+
+/// Resource holding the handle to the loaded droplet configuration
+#[derive(Resource)]
+pub struct DropletConfigHandle(pub Handle<DropletConfig>);
+
+/// Flash visual effect configuration
+///
+/// Loaded from `assets/config/effects/flash.ron`.
+/// Controls duration, opacity, and size of local and screen flash effects.
+#[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+pub struct FlashConfig {
+    /// Duration of the local flash in seconds
+    pub local_duration: f32,
+    /// Starting alpha for the local flash sprite
+    pub local_initial_alpha: f32,
+    /// Initial flash size = fruit_radius × this multiplier
+    pub local_size_multiplier: f32,
+    /// Duration of the full-screen flash in seconds
+    pub screen_duration: f32,
+    /// Starting alpha for the screen flash overlay
+    pub screen_initial_alpha: f32,
+    /// Minimum fruit index (0-based) that triggers a screen flash
+    pub screen_flash_min_index: usize,
+}
+
+/// Resource holding the handle to the loaded flash configuration
+#[derive(Resource)]
+pub struct FlashConfigHandle(pub Handle<FlashConfig>);
+
 /// Plugin for game configuration management
 pub struct GameConfigPlugin;
 
@@ -138,7 +244,13 @@ impl Plugin for GameConfigPlugin {
             .init_asset::<PhysicsConfig>()
             .register_asset_loader(PhysicsConfigLoader)
             .init_asset::<GameRulesConfig>()
-            .register_asset_loader(GameRulesConfigLoader);
+            .register_asset_loader(GameRulesConfigLoader)
+            .init_asset::<BounceConfig>()
+            .register_asset_loader(BounceConfigLoader)
+            .init_asset::<DropletConfig>()
+            .register_asset_loader(DropletConfigLoader)
+            .init_asset::<FlashConfig>()
+            .register_asset_loader(FlashConfigLoader);
 
         // Load all configs and insert handles immediately
         let asset_server = app.world_mut().resource::<AssetServer>();
@@ -146,10 +258,16 @@ impl Plugin for GameConfigPlugin {
         let fruits_handle: Handle<FruitsConfig> = asset_server.load("config/fruits.ron");
         let physics_handle: Handle<PhysicsConfig> = asset_server.load("config/physics.ron");
         let game_rules_handle: Handle<GameRulesConfig> = asset_server.load("config/game_rules.ron");
+        let bounce_handle: Handle<BounceConfig> = asset_server.load("config/effects/bounce.ron");
+        let droplet_handle: Handle<DropletConfig> = asset_server.load("config/effects/droplet.ron");
+        let flash_handle: Handle<FlashConfig> = asset_server.load("config/effects/flash.ron");
 
         app.insert_resource(FruitsConfigHandle(fruits_handle))
             .insert_resource(PhysicsConfigHandle(physics_handle))
-            .insert_resource(GameRulesConfigHandle(game_rules_handle));
+            .insert_resource(GameRulesConfigHandle(game_rules_handle))
+            .insert_resource(BounceConfigHandle(bounce_handle))
+            .insert_resource(DropletConfigHandle(droplet_handle))
+            .insert_resource(FlashConfigHandle(flash_handle));
 
         // Add hot-reload systems
         app.add_systems(
@@ -158,11 +276,16 @@ impl Plugin for GameConfigPlugin {
                 hot_reload_fruits_config,
                 hot_reload_physics_config,
                 hot_reload_game_rules_config,
+                hot_reload_bounce_config,
+                hot_reload_droplet_config,
+                hot_reload_flash_config,
             ),
         );
 
         info!("✅ GameConfigPlugin initialized");
-        info!("🔍 All configs load requested (fruits, physics, game_rules)");
+        info!(
+            "🔍 All configs load requested (fruits, physics, game_rules, bounce, droplet, flash)"
+        );
     }
 }
 
@@ -637,6 +760,176 @@ fn hot_reload_game_rules_config(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Effect config loaders
+// ---------------------------------------------------------------------------
+
+/// Asset loader for BounceConfig RON files
+#[derive(Default)]
+pub struct BounceConfigLoader;
+
+impl AssetLoader for BounceConfigLoader {
+    type Asset = BounceConfig;
+    type Settings = ();
+    type Error = std::io::Error;
+
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        let config: BounceConfig = ron::de::from_bytes(&bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(config)
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["ron"]
+    }
+}
+
+/// Asset loader for DropletConfig RON files
+#[derive(Default)]
+pub struct DropletConfigLoader;
+
+impl AssetLoader for DropletConfigLoader {
+    type Asset = DropletConfig;
+    type Settings = ();
+    type Error = std::io::Error;
+
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        let config: DropletConfig = ron::de::from_bytes(&bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(config)
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["ron"]
+    }
+}
+
+/// Asset loader for FlashConfig RON files
+#[derive(Default)]
+pub struct FlashConfigLoader;
+
+impl AssetLoader for FlashConfigLoader {
+    type Asset = FlashConfig;
+    type Settings = ();
+    type Error = std::io::Error;
+
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        let config: FlashConfig = ron::de::from_bytes(&bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(config)
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["ron"]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Effect config hot-reload systems
+// ---------------------------------------------------------------------------
+
+/// Handles hot-reloading of bounce effect configuration
+fn hot_reload_bounce_config(
+    mut events: MessageReader<AssetEvent<BounceConfig>>,
+    config_assets: Res<Assets<BounceConfig>>,
+    config_handle: Res<BounceConfigHandle>,
+) {
+    for event in events.read() {
+        match event {
+            AssetEvent::Added { id: _ } => {
+                info!("✅ Bounce effect config loaded");
+            }
+            AssetEvent::Modified { id: _ } => {
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    info!(
+                        "🔥 Hot-reloading bounce config! merge_amp={}, landing_amp={}",
+                        config.merge_amplitude, config.landing_amplitude
+                    );
+                }
+            }
+            AssetEvent::Removed { id: _ } => {
+                warn!("⚠️ Bounce effect config removed");
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Handles hot-reloading of droplet effect configuration
+fn hot_reload_droplet_config(
+    mut events: MessageReader<AssetEvent<DropletConfig>>,
+    config_assets: Res<Assets<DropletConfig>>,
+    config_handle: Res<DropletConfigHandle>,
+) {
+    for event in events.read() {
+        match event {
+            AssetEvent::Added { id: _ } => {
+                info!("✅ Droplet effect config loaded");
+            }
+            AssetEvent::Modified { id: _ } => {
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    info!(
+                        "🔥 Hot-reloading droplet config! count_merge={}, count_landing={}",
+                        config.count_merge, config.count_landing
+                    );
+                }
+            }
+            AssetEvent::Removed { id: _ } => {
+                warn!("⚠️ Droplet effect config removed");
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Handles hot-reloading of flash effect configuration
+fn hot_reload_flash_config(
+    mut events: MessageReader<AssetEvent<FlashConfig>>,
+    config_assets: Res<Assets<FlashConfig>>,
+    config_handle: Res<FlashConfigHandle>,
+) {
+    for event in events.read() {
+        match event {
+            AssetEvent::Added { id: _ } => {
+                info!("✅ Flash effect config loaded");
+            }
+            AssetEvent::Modified { id: _ } => {
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    info!(
+                        "🔥 Hot-reloading flash config! local_duration={}, screen_flash_min_index={}",
+                        config.local_duration, config.screen_flash_min_index
+                    );
+                }
+            }
+            AssetEvent::Removed { id: _ } => {
+                warn!("⚠️ Flash effect config removed");
+            }
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -795,5 +1088,70 @@ GameRulesConfig(
             radius,
             &config
         )); // Center at 175, edge at 195 < 200
+    }
+
+    #[test]
+    fn test_bounce_config_deserialization() {
+        let ron_data = r#"
+BounceConfig(
+    merge_amplitude: 0.3,
+    merge_frequency: 18.0,
+    merge_damping: 6.0,
+    landing_amplitude: 0.18,
+    landing_frequency: 22.0,
+    landing_damping: 9.0,
+    settle_threshold: 0.01,
+    settle_min_elapsed: 0.3,
+)
+"#;
+        let config: BounceConfig = ron::de::from_str(ron_data).unwrap();
+        assert_eq!(config.merge_amplitude, 0.3);
+        assert_eq!(config.merge_frequency, 18.0);
+        assert_eq!(config.landing_amplitude, 0.18);
+        assert_eq!(config.settle_threshold, 0.01);
+    }
+
+    #[test]
+    fn test_droplet_config_deserialization() {
+        let ron_data = r#"
+DropletConfig(
+    count_merge: 12,
+    count_landing: 5,
+    radius: 2.5,
+    color: (r: 0.5, g: 0.78, b: 0.95, a: 0.85),
+    min_speed: 80.0,
+    max_speed: 350.0,
+    lifetime_min: 0.4,
+    lifetime_max: 0.9,
+    gravity: -600.0,
+    bounce_damping: 0.55,
+)
+"#;
+        let config: DropletConfig = ron::de::from_str(ron_data).unwrap();
+        assert_eq!(config.count_merge, 12);
+        assert_eq!(config.count_landing, 5);
+        assert_eq!(config.radius, 2.5);
+        assert_eq!(config.min_speed, 80.0);
+        assert_eq!(config.max_speed, 350.0);
+        assert_eq!(config.gravity, -600.0);
+        assert!((config.color.r - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_flash_config_deserialization() {
+        let ron_data = r#"
+FlashConfig(
+    local_duration: 0.3,
+    local_initial_alpha: 0.6,
+    local_size_multiplier: 2.5,
+    screen_duration: 0.25,
+    screen_initial_alpha: 0.35,
+    screen_flash_min_index: 8,
+)
+"#;
+        let config: FlashConfig = ron::de::from_str(ron_data).unwrap();
+        assert_eq!(config.local_duration, 0.3);
+        assert_eq!(config.local_initial_alpha, 0.6);
+        assert_eq!(config.screen_flash_min_index, 8);
     }
 }

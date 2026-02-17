@@ -4,6 +4,7 @@
 //! physics, and gameplay mechanics using Bevy's ECS (Entity-Component-System).
 
 pub mod collision;
+pub mod effects;
 pub mod input;
 pub mod merge;
 pub mod preview;
