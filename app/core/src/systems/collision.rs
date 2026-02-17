@@ -38,7 +38,7 @@ pub struct ProcessedCollisions {
 ///
 /// - Both entities must have the `Fruit` component
 /// - Neither entity may already be a `MergeCandidate`
-/// - Both must be in `FruitSpawnState::Landed` state
+/// - Neither may be in `FruitSpawnState::Held` state (still aimed by the player)
 /// - Both must have the same `FruitType`
 #[allow(clippy::type_complexity)]
 pub fn detect_fruit_collision(
@@ -75,8 +75,8 @@ pub fn detect_fruit_collision(
             continue;
         };
 
-        // Only merge fruits that have settled (not still held or falling)
-        if *state1 != FruitSpawnState::Landed || *state2 != FruitSpawnState::Landed {
+        // Skip fruits still held by the player (not yet dropped)
+        if *state1 == FruitSpawnState::Held || *state2 == FruitSpawnState::Held {
             continue;
         }
 

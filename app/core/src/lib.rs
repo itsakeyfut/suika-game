@@ -93,6 +93,9 @@ pub mod prelude {
     // Collision
     pub use crate::systems::collision::ProcessedCollisions;
 
+    // Score
+    pub use crate::systems::score::combo_multiplier;
+
     // Plugin
     pub use crate::GameCorePlugin;
 }
@@ -149,16 +152,25 @@ impl Plugin for GameCorePlugin {
         // Initialize collision detection resources
         app.init_resource::<systems::collision::ProcessedCollisions>();
 
-        // Collision detection and merge systems (Phase 5)
+        // Collision detection, merge, and score systems (Phase 5)
         app.add_systems(
             Update,
             (
                 systems::collision::detect_fruit_collision,
                 systems::merge::handle_fruit_merge
                     .after(systems::collision::detect_fruit_collision),
+                systems::score::update_score_on_merge
+                    .after(systems::collision::detect_fruit_collision),
                 systems::collision::clear_processed_collisions
-                    .after(systems::merge::handle_fruit_merge),
+                    .after(systems::merge::handle_fruit_merge)
+                    .after(systems::score::update_score_on_merge),
             ),
+        );
+
+        // Combo timer tick (must run after merge scoring to avoid premature combo resets)
+        app.add_systems(
+            Update,
+            systems::score::tick_combo_timer.after(systems::score::update_score_on_merge),
         );
     }
 }
