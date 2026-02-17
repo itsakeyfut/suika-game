@@ -42,7 +42,17 @@ pub fn setup_fruit_preview(
 ) {
     // Get the configs
     let radius = if let Some(config) = fruits_config_assets.get(&fruits_config_handle.0) {
-        next_fruit.get().parameters_from_config(config).radius
+        next_fruit
+            .get()
+            .try_parameters_from_config(config)
+            .map(|p| p.radius)
+            .unwrap_or_else(|| {
+                warn!(
+                    "⚠️ No config entry for fruit {:?}, using default radius",
+                    next_fruit.get()
+                );
+                20.0
+            })
     } else {
         warn!("Fruits config not loaded yet, using default radius for preview");
         20.0 // Default to smallest fruit
@@ -149,8 +159,14 @@ pub fn update_fruit_preview(
             sprite.color = next_fruit.get().placeholder_color();
             if let Some(fruits_cfg) = fruits_config {
                 let preview_scale = game_rules.map(|r| r.preview_scale).unwrap_or(1.5);
-                let params = next_fruit.get().parameters_from_config(fruits_cfg);
-                sprite.custom_size = Some(Vec2::splat(params.radius * 2.0 * preview_scale));
+                if let Some(params) = next_fruit.get().try_parameters_from_config(fruits_cfg) {
+                    sprite.custom_size = Some(Vec2::splat(params.radius * 2.0 * preview_scale));
+                } else {
+                    warn!(
+                        "⚠️ No config entry for preview fruit {:?}, keeping previous size",
+                        next_fruit.get()
+                    );
+                }
             }
         }
     }
