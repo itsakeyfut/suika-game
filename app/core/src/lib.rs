@@ -200,7 +200,7 @@ impl Plugin for GameCorePlugin {
             (
                 systems::effects::droplet::spawn_merge_droplets
                     .after(systems::merge::handle_fruit_merge),
-                systems::effects::droplet::spawn_landing_droplets,
+                systems::effects::droplet::handle_fruit_landing,
                 systems::effects::droplet::update_water_droplets,
             ),
         );

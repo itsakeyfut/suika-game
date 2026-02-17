@@ -107,12 +107,32 @@ fn spawn_droplets(
         .map(|c| c.lifetime_max)
         .unwrap_or(DROPLET_LIFETIME_MAX);
 
+    // Guard against inverted ranges that would cause rng.random_range to panic
+    let speed_max = if max_speed > min_speed {
+        max_speed
+    } else {
+        warn!(
+            "DropletConfig: max_speed ({}) <= min_speed ({}), using min_speed + 1.0",
+            max_speed, min_speed
+        );
+        min_speed + 1.0
+    };
+    let lt_max = if lifetime_max > lifetime_min {
+        lifetime_max
+    } else {
+        warn!(
+            "DropletConfig: lifetime_max ({}) <= lifetime_min ({}), using lifetime_min + 0.01",
+            lifetime_max, lifetime_min
+        );
+        lifetime_min + 0.01
+    };
+
     let mut rng = rand::rng();
     for _ in 0..count {
         let angle = rng.random_range(0.0_f32..std::f32::consts::TAU);
-        let speed = rng.random_range(min_speed..max_speed);
+        let speed = rng.random_range(min_speed..speed_max);
         let velocity = Vec2::new(angle.cos() * speed, angle.sin() * speed);
-        let lifetime = rng.random_range(lifetime_min..lifetime_max);
+        let lifetime = rng.random_range(lifetime_min..lt_max);
 
         commands.spawn((
             WaterDroplet {
@@ -157,13 +177,14 @@ pub fn spawn_merge_droplets(
     }
 }
 
-/// Spawns water droplets when a fruit transitions to the `Landed` state
+/// Handles fruit landing: spawns water droplets and inserts the impact bounce animation
 ///
 /// Uses Bevy's change detection (`Changed<FruitSpawnState>`) to detect the
-/// moment a falling fruit lands, spawns a small splash, and also inserts the
-/// landing impact bounce animation on the fruit itself.
+/// moment a falling fruit lands. For each newly-landed fruit it:
+/// 1. Spawns a small splash of water droplets
+/// 2. Inserts `SquashStretchAnimation::for_landing` on the fruit entity
 #[allow(clippy::type_complexity)]
-pub fn spawn_landing_droplets(
+pub fn handle_fruit_landing(
     mut commands: Commands,
     changed_fruits: Query<
         (
@@ -265,7 +286,13 @@ pub fn update_water_droplets(
 
         // --- Alpha fade ---
         droplet.lifetime += dt;
-        let progress = (droplet.lifetime / droplet.max_lifetime).clamp(0.0, 1.0);
+        // Guard against NaN when max_lifetime is zero (should not happen in practice,
+        // but defensively avoid 0.0 / 0.0 which clamp() does not sanitize in Rust).
+        let progress = if droplet.max_lifetime <= 0.0 {
+            1.0
+        } else {
+            (droplet.lifetime / droplet.max_lifetime).clamp(0.0, 1.0)
+        };
         let alpha = (1.0 - progress) * 0.85;
         sprite.color = sprite.color.with_alpha(alpha);
 

@@ -383,86 +383,47 @@ fn hot_reload_fruits_config(
     }
 }
 
-/// Asset loader for FruitsConfig RON files
-#[derive(Default)]
-pub struct FruitsConfigLoader;
+/// Generates a RON-based `AssetLoader` implementation for a config type.
+///
+/// All game config assets use identical loading logic (read bytes → `ron::de::from_bytes`),
+/// so this macro eliminates the repetition while keeping each loader a distinct type.
+///
+/// # Usage
+/// ```ignore
+/// ron_asset_loader!(MyConfigLoader, MyConfig);
+/// ```
+macro_rules! ron_asset_loader {
+    ($loader:ident, $asset:ty) => {
+        #[derive(Default)]
+        pub struct $loader;
 
-impl AssetLoader for FruitsConfigLoader {
-    type Asset = FruitsConfig;
-    type Settings = ();
-    type Error = std::io::Error;
+        impl AssetLoader for $loader {
+            type Asset = $asset;
+            type Settings = ();
+            type Error = std::io::Error;
 
-    async fn load(
-        &self,
-        reader: &mut dyn Reader,
-        _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let config: FruitsConfig = ron::de::from_bytes(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(config)
-    }
+            async fn load(
+                &self,
+                reader: &mut dyn Reader,
+                _settings: &Self::Settings,
+                _load_context: &mut LoadContext<'_>,
+            ) -> Result<Self::Asset, Self::Error> {
+                let mut bytes = Vec::new();
+                reader.read_to_end(&mut bytes).await?;
+                ron::de::from_bytes(&bytes)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+            }
 
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
+            fn extensions(&self) -> &[&str] {
+                &["ron"]
+            }
+        }
+    };
 }
 
-/// Asset loader for PhysicsConfig RON files
-#[derive(Default)]
-pub struct PhysicsConfigLoader;
-
-impl AssetLoader for PhysicsConfigLoader {
-    type Asset = PhysicsConfig;
-    type Settings = ();
-    type Error = std::io::Error;
-
-    async fn load(
-        &self,
-        reader: &mut dyn Reader,
-        _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let config: PhysicsConfig = ron::de::from_bytes(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(config)
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
-}
-
-/// Asset loader for GameRulesConfig RON files
-#[derive(Default)]
-pub struct GameRulesConfigLoader;
-
-impl AssetLoader for GameRulesConfigLoader {
-    type Asset = GameRulesConfig;
-    type Settings = ();
-    type Error = std::io::Error;
-
-    async fn load(
-        &self,
-        reader: &mut dyn Reader,
-        _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let config: GameRulesConfig = ron::de::from_bytes(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(config)
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
-}
+ron_asset_loader!(FruitsConfigLoader, FruitsConfig);
+ron_asset_loader!(PhysicsConfigLoader, PhysicsConfig);
+ron_asset_loader!(GameRulesConfigLoader, GameRulesConfig);
 
 /// Updates Rapier's gravity setting when physics config changes
 ///
@@ -766,86 +727,9 @@ fn hot_reload_game_rules_config(
 // Effect config loaders
 // ---------------------------------------------------------------------------
 
-/// Asset loader for BounceConfig RON files
-#[derive(Default)]
-pub struct BounceConfigLoader;
-
-impl AssetLoader for BounceConfigLoader {
-    type Asset = BounceConfig;
-    type Settings = ();
-    type Error = std::io::Error;
-
-    async fn load(
-        &self,
-        reader: &mut dyn Reader,
-        _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let config: BounceConfig = ron::de::from_bytes(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(config)
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
-}
-
-/// Asset loader for DropletConfig RON files
-#[derive(Default)]
-pub struct DropletConfigLoader;
-
-impl AssetLoader for DropletConfigLoader {
-    type Asset = DropletConfig;
-    type Settings = ();
-    type Error = std::io::Error;
-
-    async fn load(
-        &self,
-        reader: &mut dyn Reader,
-        _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let config: DropletConfig = ron::de::from_bytes(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(config)
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
-}
-
-/// Asset loader for FlashConfig RON files
-#[derive(Default)]
-pub struct FlashConfigLoader;
-
-impl AssetLoader for FlashConfigLoader {
-    type Asset = FlashConfig;
-    type Settings = ();
-    type Error = std::io::Error;
-
-    async fn load(
-        &self,
-        reader: &mut dyn Reader,
-        _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<Self::Asset, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        let config: FlashConfig = ron::de::from_bytes(&bytes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(config)
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
-}
+ron_asset_loader!(BounceConfigLoader, BounceConfig);
+ron_asset_loader!(DropletConfigLoader, DropletConfig);
+ron_asset_loader!(FlashConfigLoader, FlashConfig);
 
 // ---------------------------------------------------------------------------
 // Effect config hot-reload systems
