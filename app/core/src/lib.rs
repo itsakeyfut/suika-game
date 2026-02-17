@@ -83,9 +83,10 @@ pub mod prelude {
 
     // Config
     pub use crate::config::{
-        BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, FlashConfig,
-        FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin,
-        GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle, RonColor,
+        BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle,
+        FlashConfig, FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle,
+        GameConfigPlugin, GameRulesConfig, GameRulesConfigHandle, PhysicsConfig,
+        PhysicsConfigHandle, RonColor,
     };
 
     // Events
@@ -100,7 +101,7 @@ pub mod prelude {
     // Effects
     pub use crate::systems::effects::MergeAnimation;
     pub use crate::systems::effects::bounce::SquashStretchAnimation;
-    pub use crate::systems::effects::droplet::WaterDroplet;
+    pub use crate::systems::effects::droplet::{DropletColorMode, WaterDroplet};
     pub use crate::systems::effects::flash::{LocalFlashAnimation, ScreenFlashAnimation};
 
     // Plugin

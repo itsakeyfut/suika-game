@@ -187,8 +187,10 @@ pub struct DropletConfig {
     pub count_landing: u32,
     /// Visual radius of each droplet in pixels
     pub radius: f32,
-    /// RGBA color of droplets
+    /// Base RGBA color used when `color_mode` is `Water`
     pub color: RonColor,
+    /// Controls whether droplets use a fixed water color or the fruit's own color
+    pub color_mode: crate::systems::effects::droplet::DropletColorMode,
     /// Minimum initial speed in pixels/second
     pub min_speed: f32,
     /// Maximum initial speed in pixels/second
@@ -1119,6 +1121,7 @@ DropletConfig(
     count_landing: 5,
     radius: 2.5,
     color: (r: 0.5, g: 0.78, b: 0.95, a: 0.85),
+    color_mode: Juice,
     min_speed: 80.0,
     max_speed: 350.0,
     lifetime_min: 0.4,
@@ -1131,6 +1134,10 @@ DropletConfig(
         assert_eq!(config.count_merge, 12);
         assert_eq!(config.count_landing, 5);
         assert_eq!(config.radius, 2.5);
+        assert_eq!(
+            config.color_mode,
+            crate::systems::effects::droplet::DropletColorMode::Juice
+        );
         assert_eq!(config.min_speed, 80.0);
         assert_eq!(config.max_speed, 350.0);
         assert_eq!(config.gravity, -600.0);

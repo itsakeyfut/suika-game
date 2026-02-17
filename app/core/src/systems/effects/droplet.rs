@@ -6,6 +6,7 @@
 
 use bevy::prelude::*;
 use rand::RngExt;
+use serde::Deserialize;
 
 use crate::components::{Fruit, FruitSpawnState};
 use crate::config::{
@@ -14,6 +15,21 @@ use crate::config::{
 };
 use crate::events::FruitMergeEvent;
 use crate::systems::effects::bounce::SquashStretchAnimation;
+
+// --- Color Mode ---
+
+/// Controls how water droplet color is determined
+///
+/// - `Water`: all droplets use the fixed base color (a blue-ish water tone)
+/// - `Juice`: droplets inherit the color of the fruit that triggered them
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DropletColorMode {
+    /// Use the fixed water color defined in `DropletConfig.color`
+    #[default]
+    Water,
+    /// Use the triggering fruit's placeholder color
+    Juice,
+}
 
 // --- Constants ---
 
@@ -55,6 +71,22 @@ pub struct WaterDroplet {
 }
 
 // --- Internal helper ---
+
+/// Resolves the droplet spawn color from config mode and fruit color.
+///
+/// - `Water`: uses the fixed base color defined in `DropletConfig.color`
+/// - `Juice`: uses the fruit's own placeholder color
+fn resolve_droplet_color(config: Option<&DropletConfig>, fruit_color: Color) -> Color {
+    let mode = config
+        .map(|c| c.color_mode)
+        .unwrap_or(DropletColorMode::Water);
+    match mode {
+        DropletColorMode::Water => config
+            .map(|c| Color::from(c.color))
+            .unwrap_or(DROPLET_COLOR),
+        DropletColorMode::Juice => fruit_color,
+    }
+}
 
 /// Spawns `count` droplets radiating from `position` using values from `config`
 /// (or falling back to the module constants when `config` is `None`).
@@ -120,7 +152,8 @@ pub fn spawn_merge_droplets(
 
     for event in merge_events.read() {
         let fruit_color = event.fruit_type.placeholder_color();
-        spawn_droplets(&mut commands, event.position, fruit_color, count, config);
+        let color = resolve_droplet_color(config, fruit_color);
+        spawn_droplets(&mut commands, event.position, color, count, config);
     }
 }
 
@@ -165,7 +198,8 @@ pub fn spawn_landing_droplets(
         }
 
         let pos = transform.translation.truncate();
-        let color = fruit_type.placeholder_color();
+        let fruit_color = fruit_type.placeholder_color();
+        let color = resolve_droplet_color(droplet_cfg, fruit_color);
         spawn_droplets(&mut commands, pos, color, count, droplet_cfg);
 
         // Add landing bounce (squash-and-stretch) to the fruit

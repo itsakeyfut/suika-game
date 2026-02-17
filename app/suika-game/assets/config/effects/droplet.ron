@@ -9,7 +9,10 @@
 //
 // Visual:
 //   radius        - Droplet sprite radius in pixels
-//   color         - RGBA color of droplets (r, g, b, a each 0.0–1.0)
+//   color         - RGBA base color used in Water mode (r, g, b, a each 0.0–1.0)
+//   color_mode    - Color selection mode:
+//                     Water  … all droplets use the fixed `color` value (blue-ish water)
+//                     Juice  … droplets take the color of the fruit that triggered them
 //
 // Velocity:
 //   min_speed     - Minimum initial speed (pixels/s)
@@ -31,6 +34,8 @@ DropletConfig(
     // Visual
     radius: 2.5,
     color: (r: 0.5, g: 0.78, b: 0.95, a: 0.85),
+    // Change to Water for a uniform blue-ish water look
+    color_mode: Juice,
 
     // Velocity
     min_speed: 80.0,
