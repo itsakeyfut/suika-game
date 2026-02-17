@@ -167,8 +167,11 @@ impl Plugin for GameCorePlugin {
             ),
         );
 
-        // Combo timer tick (runs every frame independent of merge events)
-        app.add_systems(Update, systems::score::tick_combo_timer);
+        // Combo timer tick (must run after merge scoring to avoid premature combo resets)
+        app.add_systems(
+            Update,
+            systems::score::tick_combo_timer.after(systems::score::update_score_on_merge),
+        );
     }
 }
 

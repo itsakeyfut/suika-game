@@ -31,6 +31,7 @@ use crate::resources::{ComboTimer, GameState};
 ///
 /// ```
 /// # use suika_game_core::systems::score::combo_multiplier;
+/// assert_eq!(combo_multiplier(0), 1.0); // invalid input → treated as no combo
 /// assert_eq!(combo_multiplier(1), 1.0);
 /// assert_eq!(combo_multiplier(2), 1.1);
 /// assert_eq!(combo_multiplier(3), 1.2);
@@ -40,7 +41,7 @@ use crate::resources::{ComboTimer, GameState};
 /// ```
 pub fn combo_multiplier(combo: u32) -> f32 {
     match combo {
-        1 => 1.0,
+        0 | 1 => 1.0,
         2 => 1.1,
         3 => 1.2,
         4 => 1.3,
