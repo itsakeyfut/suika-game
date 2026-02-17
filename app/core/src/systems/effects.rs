@@ -42,7 +42,13 @@ impl MergeAnimation {
     pub const DEFAULT_DURATION: f32 = 0.25;
 
     /// Returns the normalized progress in `[0.0, 1.0]`
+    ///
+    /// Returns `1.0` immediately when `duration <= 0.0` to avoid `NaN`
+    /// from `0.0 / 0.0` (which `clamp` does not sanitize in Rust).
     pub fn progress(&self) -> f32 {
+        if self.duration <= 0.0 {
+            return 1.0;
+        }
         (self.elapsed / self.duration).clamp(0.0, 1.0)
     }
 
@@ -119,6 +125,19 @@ mod tests {
         let mut anim = MergeAnimation::new(0.25);
         anim.elapsed = 10.0; // Way past the end
         assert_eq!(anim.progress(), 1.0);
+        assert_eq!(anim.scale_factor(), 1.0);
+    }
+
+    #[test]
+    fn test_merge_animation_progress_zero_duration_no_nan() {
+        // duration == 0 would cause 0/0 = NaN without the guard
+        let anim = MergeAnimation::new(0.0);
+        let p = anim.progress();
+        assert!(
+            p.is_finite(),
+            "progress() must not return NaN or Inf when duration is 0"
+        );
+        assert_eq!(p, 1.0, "zero-duration animation should be immediately done");
         assert_eq!(anim.scale_factor(), 1.0);
     }
 

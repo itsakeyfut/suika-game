@@ -117,14 +117,9 @@ pub fn spawn_merge_droplets(
         .zip(droplet_config_assets.as_ref())
         .and_then(|(h, a)| a.get(&h.0));
     let count = config.map(|c| c.count_merge).unwrap_or(DROPLET_COUNT_MERGE);
-    let color = config
-        .map(|c| Color::from(c.color))
-        .unwrap_or(DROPLET_COLOR);
 
     for event in merge_events.read() {
         let fruit_color = event.fruit_type.placeholder_color();
-        // Blend the droplet base color toward the fruit color for variety
-        let _ = color; // base color available; use fruit color for now
         spawn_droplets(&mut commands, event.position, fruit_color, count, config);
     }
 }
@@ -238,7 +233,7 @@ pub fn update_water_droplets(
         droplet.lifetime += dt;
         let progress = (droplet.lifetime / droplet.max_lifetime).clamp(0.0, 1.0);
         let alpha = (1.0 - progress) * 0.85;
-        sprite.color = DROPLET_COLOR.with_alpha(alpha);
+        sprite.color = sprite.color.with_alpha(alpha);
 
         // --- Despawn when lifetime expires ---
         if droplet.lifetime >= droplet.max_lifetime {
