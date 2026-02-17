@@ -83,10 +83,9 @@ pub mod prelude {
 
     // Config
     pub use crate::config::{
-        BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle,
-        FlashConfig, FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle,
-        GameConfigPlugin, GameRulesConfig, GameRulesConfigHandle, PhysicsConfig,
-        PhysicsConfigHandle, RonColor,
+        BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, FlashConfig,
+        FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin,
+        GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle, RonColor,
     };
 
     // Events
@@ -214,6 +213,32 @@ impl Plugin for GameCorePlugin {
                 systems::effects::flash::animate_local_flash,
                 systems::effects::flash::animate_screen_flash,
             ),
+        );
+
+        // Phase 6: boundary overflow detection and game-over transition
+        // All three run only during active gameplay.
+        app.add_systems(
+            Update,
+            (
+                systems::boundary::check_boundary_overflow,
+                systems::boundary::trigger_game_over
+                    .after(systems::boundary::check_boundary_overflow),
+                systems::boundary::animate_boundary_warning
+                    .after(systems::boundary::check_boundary_overflow),
+            )
+                .run_if(in_state(states::AppState::Playing)),
+        );
+
+        // Phase 6: highscore persistence on game over
+        app.add_systems(
+            OnEnter(states::AppState::GameOver),
+            systems::game_over::save_highscore_on_game_over,
+        );
+
+        // Phase 6: full game reset on (re)entering Playing state
+        app.add_systems(
+            OnEnter(states::AppState::Playing),
+            systems::game_over::reset_game_state,
         );
     }
 }
