@@ -90,8 +90,9 @@ pub mod prelude {
     // Events
     pub use crate::events::FruitMergeEvent;
 
-    // Collision
+    // Collision & Merge
     pub use crate::systems::collision::ProcessedCollisions;
+    pub use crate::systems::merge::handle_fruit_merge;
 
     // Plugin
     pub use crate::GameCorePlugin;
@@ -149,13 +150,15 @@ impl Plugin for GameCorePlugin {
         // Initialize collision detection resources
         app.init_resource::<systems::collision::ProcessedCollisions>();
 
-        // Collision detection systems (Phase 5)
+        // Collision detection and merge systems (Phase 5)
         app.add_systems(
             Update,
             (
                 systems::collision::detect_fruit_collision,
-                systems::collision::clear_processed_collisions
+                systems::merge::handle_fruit_merge
                     .after(systems::collision::detect_fruit_collision),
+                systems::collision::clear_processed_collisions
+                    .after(systems::merge::handle_fruit_merge),
             ),
         );
     }
