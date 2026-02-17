@@ -90,6 +90,9 @@ pub mod prelude {
     // Events
     pub use crate::events::FruitMergeEvent;
 
+    // Collision
+    pub use crate::systems::collision::ProcessedCollisions;
+
     // Plugin
     pub use crate::GameCorePlugin;
 }
@@ -140,15 +143,21 @@ impl Plugin for GameCorePlugin {
             .init_resource::<systems::input::InputMode>()
             .init_resource::<systems::input::LastCursorPosition>();
 
-        // Register events (Phase 5+)
+        // Register events
         app.add_message::<events::FruitMergeEvent>();
 
-        // TODO: Phase 5+ - Register collision and merge systems
-        // app.add_systems(Update, (
-        //     collision::detect_fruit_collision,
-        //     collision::handle_fruit_merge,
-        //     score::update_score_on_merge,
-        // ));
+        // Initialize collision detection resources
+        app.init_resource::<systems::collision::ProcessedCollisions>();
+
+        // Collision detection systems (Phase 5)
+        app.add_systems(
+            Update,
+            (
+                systems::collision::detect_fruit_collision,
+                systems::collision::clear_processed_collisions
+                    .after(systems::collision::detect_fruit_collision),
+            ),
+        );
     }
 }
 
