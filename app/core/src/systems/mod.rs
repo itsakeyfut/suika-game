@@ -7,4 +7,5 @@ pub mod collision;
 pub mod input;
 pub mod merge;
 pub mod preview;
+pub mod score;
 pub mod spawn;
