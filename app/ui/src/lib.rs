@@ -4,10 +4,10 @@
 
 use bevy::prelude::*;
 
+pub mod components;
 pub mod styles;
 
 // TODO: モジュールの追加
-// pub mod components;
 // pub mod screens;
 
 /// UIプラグイン
