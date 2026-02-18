@@ -9,6 +9,7 @@
 use bevy::asset::io::Reader;
 use bevy::asset::{Asset, AssetLoader, LoadContext};
 use bevy::prelude::*;
+use crate::states::AppState;
 use bevy_rapier2d::prelude::{
     Collider, ColliderMassProperties, DefaultRapierContext, Friction, RapierConfiguration,
     Restitution,
@@ -271,7 +272,7 @@ impl Plugin for GameConfigPlugin {
             .insert_resource(DropletConfigHandle(droplet_handle))
             .insert_resource(FlashConfigHandle(flash_handle));
 
-        // Add hot-reload systems
+        // Add hot-reload systems (run in all states so live-edit always works)
         app.add_systems(
             Update,
             (
@@ -284,10 +285,50 @@ impl Plugin for GameConfigPlugin {
             ),
         );
 
+        // Transition Loading → Title once all required configs are ready
+        app.add_systems(
+            Update,
+            wait_for_configs.run_if(in_state(AppState::Loading)),
+        );
+
         info!("✅ GameConfigPlugin initialized");
         info!(
             "🔍 All configs load requested (fruits, physics, game_rules, bounce, droplet, flash)"
         );
+    }
+}
+
+/// Transitions from `Loading` → `Title` once all required RON configs are ready.
+///
+/// Runs every frame during `AppState::Loading` and checks whether the three
+/// essential config assets (physics, fruits, game_rules) have finished loading.
+/// As soon as all three are available the state machine advances to `Title` so
+/// the rest of the game — including `setup_container` via `OnExit(Loading)` —
+/// can use fully-loaded values instead of fallbacks.
+fn wait_for_configs(
+    physics_handle: Res<PhysicsConfigHandle>,
+    physics_assets: Res<Assets<PhysicsConfig>>,
+    fruits_handle: Res<FruitsConfigHandle>,
+    fruits_assets: Res<Assets<FruitsConfig>>,
+    game_rules_handle: Res<GameRulesConfigHandle>,
+    game_rules_assets: Res<Assets<GameRulesConfig>>,
+    bounce_handle: Res<BounceConfigHandle>,
+    bounce_assets: Res<Assets<BounceConfig>>,
+    droplet_handle: Res<DropletConfigHandle>,
+    droplet_assets: Res<Assets<DropletConfig>>,
+    flash_handle: Res<FlashConfigHandle>,
+    flash_assets: Res<Assets<FlashConfig>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if physics_assets.get(&physics_handle.0).is_some()
+        && fruits_assets.get(&fruits_handle.0).is_some()
+        && game_rules_assets.get(&game_rules_handle.0).is_some()
+        && bounce_assets.get(&bounce_handle.0).is_some()
+        && droplet_assets.get(&droplet_handle.0).is_some()
+        && flash_assets.get(&flash_handle.0).is_some()
+    {
+        info!("✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash), transitioning to Title");
+        next_state.set(AppState::Title);
     }
 }
 
@@ -589,16 +630,40 @@ fn hot_reload_physics_config(
         match event {
             AssetEvent::Added { id: _ } => {
                 info!("✅ Physics config loaded");
-                // Apply the initial config to the boundary line, which may have been
-                // spawned with a fallback value before the asset finished loading.
-                if let Some(config) = config_assets.get(&config_handle.0)
-                    && let Ok(mut transform) = boundary_query.single_mut()
-                {
-                    transform.translation.y = config.boundary_line_y;
+                // Apply the full config to the container, which was spawned with fallback
+                // values because the RON file had not finished loading at Startup time.
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    // Apply gravity
+                    if let Ok(mut rapier_config) = rapier_query.single_mut() {
+                        update_rapier_gravity(&mut rapier_config, config.gravity);
+                    }
+
+                    // Update container walls to the values from physics.ron
+                    for (mut transform, mut collider, mut sprite, bottom_wall, left_wall) in
+                        walls_query.iter_mut()
+                    {
+                        update_wall(
+                            &mut transform,
+                            &mut collider,
+                            &mut sprite,
+                            bottom_wall.is_some(),
+                            left_wall.is_some(),
+                            config,
+                        );
+                    }
                     info!(
-                        "📐 Boundary line positioned at y={} (initial load)",
-                        config.boundary_line_y
+                        "✨ Container walls initialized from physics.ron ({}x{})",
+                        config.container_width, config.container_height
                     );
+
+                    // Update boundary line position
+                    if let Ok(mut transform) = boundary_query.single_mut() {
+                        transform.translation.y = config.boundary_line_y;
+                        info!(
+                            "📐 Boundary line positioned at y={} (initial load)",
+                            config.boundary_line_y
+                        );
+                    }
                 }
             }
             AssetEvent::Modified { id: _ } => {

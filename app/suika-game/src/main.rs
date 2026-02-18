@@ -44,10 +44,9 @@ fn main() {
         // Debug plugin (debug builds only)
         .add_plugins(DebugPlugin)
         // Startup systems
-        .add_systems(
-            Startup,
-            (setup_camera, setup_container, load_highscore_system),
-        )
+        .add_systems(Startup, (setup_camera, load_highscore_system))
+        // setup_container runs on exit from Loading so physics.ron is guaranteed loaded
+        .add_systems(OnExit(AppState::Loading), setup_container)
         // Gameplay systems — only run while actively playing
         .add_systems(
             Update,
