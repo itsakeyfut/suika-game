@@ -4,8 +4,9 @@
 
 use bevy::prelude::*;
 
+pub mod styles;
+
 // TODO: モジュールの追加
-// pub mod styles;
 // pub mod components;
 // pub mod screens;
 
