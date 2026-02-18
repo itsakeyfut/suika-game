@@ -85,10 +85,7 @@ pub fn setup_game_over_screen(
 
             // Final score
             parent.spawn((
-                Text::new(format!(
-                    "スコア: {}",
-                    format_score(game_state.score)
-                )),
+                Text::new(format!("スコア: {}", format_score(game_state.score))),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_LARGE,

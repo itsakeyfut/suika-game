@@ -113,9 +113,10 @@ pub fn update_next(
             *vis = desired;
         }
 
-        if next_fruit.is_changed() {
-            *bg = BackgroundColor(next_fruit.get().placeholder_color());
-        }
+        // Always write the correct colour so that newly-spawned preview
+        // widgets (e.g. after HUD rebuild on pause/resume) get the right
+        // colour even when NextFruitType itself has not changed this frame.
+        *bg = BackgroundColor(next_fruit.get().placeholder_color());
     }
 }
 
