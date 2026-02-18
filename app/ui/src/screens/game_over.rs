@@ -36,10 +36,11 @@ const GAME_OVER_COLOR: Color = Color::srgb(0.8, 0.2, 0.2);
 /// Spawns the game-over screen UI when entering [`AppState::GameOver`].
 ///
 /// Reads [`GameState`] to display the final score, the all-time highscore, and
-/// whether this run set a new record.  The `is_new_record` flag is set by
-/// `save_highscore_on_game_over` (core plugin) which runs on the same schedule
-/// but is guaranteed to run first via the system ordering established in
-/// [`GameCorePlugin`].
+/// whether this run set a new record.
+///
+/// This system is registered with `.after(`[`GameOverSet::SaveHighscore`]`)` in
+/// [`GameUIPlugin`] so it is guaranteed to run after `save_highscore_on_game_over`
+/// has written [`GameState::is_new_record`] and updated [`GameState::highscore`].
 ///
 /// Resets [`KeyboardFocusIndex`] to `0` so the Retry button always has focus.
 pub fn setup_game_over_screen(

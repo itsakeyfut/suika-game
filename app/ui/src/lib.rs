@@ -3,7 +3,7 @@
 //! ユーザーインターフェース：画面実装、UIコンポーネント、スタイル
 
 use bevy::prelude::*;
-use suika_game_core::prelude::AppState;
+use suika_game_core::prelude::{AppState, GameOverSet};
 
 pub mod camera;
 pub mod components;
@@ -39,10 +39,12 @@ impl Plugin for GameUIPlugin {
                 )
                     .run_if(in_state(AppState::Playing)),
             )
-            // Game-over screen
+            // Game-over screen — must run AFTER core saves the highscore so
+            // that GameState::is_new_record and highscore are up-to-date.
             .add_systems(
                 OnEnter(AppState::GameOver),
-                screens::game_over::setup_game_over_screen,
+                screens::game_over::setup_game_over_screen
+                    .after(GameOverSet::SaveHighscore),
             )
             // Button interaction (all states)
             .add_systems(
