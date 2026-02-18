@@ -39,6 +39,11 @@ impl Plugin for GameUIPlugin {
                 )
                     .run_if(in_state(AppState::Playing)),
             )
+            // Game-over screen
+            .add_systems(
+                OnEnter(AppState::GameOver),
+                screens::game_over::setup_game_over_screen,
+            )
             // Button interaction (all states)
             .add_systems(
                 Update,
@@ -47,9 +52,5 @@ impl Plugin for GameUIPlugin {
                     components::handle_keyboard_menu_navigation,
                 ),
             );
-
-        // TODO: UIシステムの登録
-        // app
-        //     .add_systems(OnEnter(AppState::GameOver), setup_game_over_screen);
     }
 }

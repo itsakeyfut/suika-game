@@ -42,6 +42,7 @@ pub fn save_highscore_on_game_over(mut game_state: ResMut<GameState>) {
             "New highscore! {} → {}",
             game_state.highscore, game_state.score
         );
+        game_state.is_new_record = true;
         game_state.highscore = game_state.score;
 
         let data = HighscoreData {
@@ -53,6 +54,7 @@ pub fn save_highscore_on_game_over(mut game_state: ResMut<GameState>) {
             Err(e) => error!("Failed to save highscore: {e}"),
         }
     } else {
+        game_state.is_new_record = false;
         info!(
             "Game over. Score: {} (Highscore: {})",
             game_state.score, game_state.highscore
@@ -79,6 +81,7 @@ pub fn reset_game_state(
         score: 0,
         highscore,
         elapsed_time: 0.0,
+        is_new_record: false,
     };
     *combo_timer = ComboTimer::default();
     *game_over_timer = GameOverTimer::default();
@@ -106,6 +109,7 @@ mod tests {
             score: 5000,
             highscore: 8000,
             elapsed_time: 42.0,
+            is_new_record: true,
         };
 
         let highscore = state.highscore;
@@ -113,11 +117,13 @@ mod tests {
             score: 0,
             highscore,
             elapsed_time: 0.0,
+            is_new_record: false,
         };
 
         assert_eq!(state.score, 0);
         assert_eq!(state.highscore, 8000);
         assert_eq!(state.elapsed_time, 0.0);
+        assert!(!state.is_new_record);
     }
 
     #[test]
