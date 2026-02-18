@@ -118,8 +118,10 @@ impl Default for GameOverTimer {
     fn default() -> Self {
         Self {
             time_over_boundary: 0.0,
-            // Default game over timer (loaded from game_rules.ron at runtime)
-            warning_threshold: 3.0,
+            // Short threshold: long enough to ignore newly dropped fruits
+            // passing through the boundary area, fast enough to feel immediate.
+            // Can be overridden from game_rules.ron at runtime.
+            warning_threshold: 0.5,
             is_warning: false,
         }
     }
@@ -271,7 +273,7 @@ mod tests {
     fn test_game_over_timer_default() {
         let timer = GameOverTimer::default();
         assert_eq!(timer.time_over_boundary, 0.0);
-        assert_eq!(timer.warning_threshold, 3.0); // Default value
+        assert_eq!(timer.warning_threshold, 0.5); // Short threshold for near-immediate game-over
         assert!(!timer.is_warning);
         assert!(!timer.is_game_over());
     }
@@ -281,18 +283,18 @@ mod tests {
         let mut timer = GameOverTimer::default();
 
         // Start warning
-        timer.tick_warning(1.0);
+        timer.tick_warning(0.2);
         assert!(timer.is_warning);
         assert!(!timer.is_game_over());
-        assert_eq!(timer.warning_progress(), 1.0 / 3.0);
+        assert_eq!(timer.warning_progress(), 0.2 / 0.5);
 
-        // Continue warning
-        timer.tick_warning(1.0);
-        assert_eq!(timer.time_over_boundary, 2.0);
+        // Continue warning — still below threshold
+        timer.tick_warning(0.2);
+        assert_eq!(timer.time_over_boundary, 0.4);
         assert!(!timer.is_game_over());
 
         // Reach game over
-        timer.tick_warning(1.5);
+        timer.tick_warning(0.2);
         assert!(timer.is_game_over());
         assert_eq!(timer.warning_progress(), 1.0);
 
