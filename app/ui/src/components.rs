@@ -192,14 +192,19 @@ pub fn spawn_menu_button(
 ///
 /// Changes the button background color on hover/press and triggers the
 /// appropriate [`AppState`] transition when a button is clicked.
+///
+/// When the mouse leaves a button (`Interaction::None`), the keyboard-focus
+/// highlight is preserved if that button is currently focused by
+/// [`KeyboardFocusIndex`].
 pub fn handle_button_interaction(
     mut interaction_query: Query<
-        (&Interaction, &MenuButton, &mut BackgroundColor),
+        (&Interaction, &MenuButton, &ButtonIndex, &mut BackgroundColor),
         Changed<Interaction>,
     >,
+    focus: Res<KeyboardFocusIndex>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    for (interaction, button, mut bg) in interaction_query.iter_mut() {
+    for (interaction, button, idx, mut bg) in interaction_query.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
                 *bg = BackgroundColor(BUTTON_PRESSED);
@@ -222,7 +227,12 @@ pub fn handle_button_interaction(
                 *bg = BackgroundColor(BUTTON_HOVER);
             }
             Interaction::None => {
-                *bg = BackgroundColor(BUTTON_NORMAL);
+                // Preserve keyboard-focus highlight when the mouse leaves.
+                *bg = BackgroundColor(if idx.0 == focus.0 {
+                    BUTTON_HOVER
+                } else {
+                    BUTTON_NORMAL
+                });
             }
         }
     }
