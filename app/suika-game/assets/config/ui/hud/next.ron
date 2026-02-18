@@ -1,0 +1,10 @@
+// Next-fruit widget configuration
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Parameters:
+// - preview_size: Diameter of the next-fruit preview circle (pixels)
+
+NextHudConfig(
+    preview_size: 80.0,
+)

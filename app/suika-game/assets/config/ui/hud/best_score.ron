@@ -1,0 +1,12 @@
+// Best-score panel widget configuration
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Parameters:
+// - panel_padding:   Inner padding of the panel node (pixels)
+// - label_value_gap: Vertical gap between the label and the value text (pixels)
+
+BestScoreHudConfig(
+    panel_padding: 10.0,
+    label_value_gap: 4.0,
+)

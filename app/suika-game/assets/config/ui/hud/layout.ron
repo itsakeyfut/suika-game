@@ -1,0 +1,17 @@
+// HUD anchor position configuration
+// Controls where each widget group is placed on screen.
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Parameters:
+// - edge_margin:        Margin from the screen edge for the score panels (pixels)
+// - score_panel_offset: Horizontal distance between the best-score and score panels (pixels)
+// - next_top:           Distance from the top of the screen for the next-fruit widget (pixels)
+// - next_right:         Distance from the right edge for the next-fruit widget (pixels)
+
+HudLayoutConfig(
+    edge_margin: 16.0,
+    score_panel_offset: 160.0,
+    next_top: 40.0,
+    next_right: 300.0,
+)
