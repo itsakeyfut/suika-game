@@ -42,6 +42,10 @@ macro_rules! ron_asset_loader {
                 ron::de::from_bytes(&bytes)
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
             }
+
+            fn extensions(&self) -> &[&str] {
+                &["ron"]
+            }
         }
     };
 }
