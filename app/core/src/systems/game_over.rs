@@ -5,15 +5,41 @@
 //! - `tick_elapsed_time` — runs every frame during `AppState::Playing`.
 //!   Increments [`GameState::elapsed_time`] so the HUD can display a live timer.
 //!
-//! - `save_highscore_on_game_over` — runs on `OnEnter(AppState::GameOver)`.
-//!   Compares the current score with the stored highscore and writes to disk
-//!   when a new record is set.
+//! - `save_highscore_on_game_over` — runs on `OnEnter(AppState::GameOver)`
+//!   inside [`GameOverSet::SaveHighscore`].  Compares the current score with
+//!   the stored highscore and writes to disk when a new record is set.
 //!
 //! - `reset_game_state` — runs on `OnEnter(AppState::Playing)`.
 //!   Clears all in-game resources and despawns existing fruits so each new
 //!   game starts from a clean slate.  The highscore is intentionally preserved.
+//!
+//! ## Ordering for downstream crates
+//!
+//! UI or other crates that need to read [`GameState::is_new_record`] on
+//! `OnEnter(AppState::GameOver)` should order their systems
+//! `.after(`[`GameOverSet::SaveHighscore`]`)` to guarantee they run after the
+//! flag has been written.
 
 use bevy::prelude::*;
+
+// ---------------------------------------------------------------------------
+// System sets
+// ---------------------------------------------------------------------------
+
+/// System-set labels for game-over lifecycle systems.
+///
+/// Downstream crates can use these labels with `.after()` / `.before()` to
+/// establish explicit ordering relative to the core game-over logic without
+/// coupling to internal function names.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum GameOverSet {
+    /// Contains [`save_highscore_on_game_over`].
+    ///
+    /// Runs on `OnEnter(AppState::GameOver)`.  After this set completes,
+    /// [`GameState::is_new_record`] and [`GameState::highscore`] are
+    /// up-to-date and safe to read.
+    SaveHighscore,
+}
 
 use crate::components::Fruit;
 use crate::constants::storage::SAVE_DIR;
@@ -42,6 +68,7 @@ pub fn save_highscore_on_game_over(mut game_state: ResMut<GameState>) {
             "New highscore! {} → {}",
             game_state.highscore, game_state.score
         );
+        game_state.is_new_record = true;
         game_state.highscore = game_state.score;
 
         let data = HighscoreData {
@@ -53,6 +80,7 @@ pub fn save_highscore_on_game_over(mut game_state: ResMut<GameState>) {
             Err(e) => error!("Failed to save highscore: {e}"),
         }
     } else {
+        game_state.is_new_record = false;
         info!(
             "Game over. Score: {} (Highscore: {})",
             game_state.score, game_state.highscore
@@ -79,6 +107,7 @@ pub fn reset_game_state(
         score: 0,
         highscore,
         elapsed_time: 0.0,
+        is_new_record: false,
     };
     *combo_timer = ComboTimer::default();
     *game_over_timer = GameOverTimer::default();
@@ -106,6 +135,7 @@ mod tests {
             score: 5000,
             highscore: 8000,
             elapsed_time: 42.0,
+            is_new_record: true,
         };
 
         let highscore = state.highscore;
@@ -113,11 +143,13 @@ mod tests {
             score: 0,
             highscore,
             elapsed_time: 0.0,
+            is_new_record: false,
         };
 
         assert_eq!(state.score, 0);
         assert_eq!(state.highscore, 8000);
         assert_eq!(state.elapsed_time, 0.0);
+        assert!(!state.is_new_record);
     }
 
     #[test]

@@ -20,6 +20,10 @@ pub struct GameState {
     pub highscore: u32,
     /// Elapsed time in seconds since game started
     pub elapsed_time: f32,
+    /// Set to `true` on `OnEnter(GameOver)` when the current score beats the
+    /// previous highscore.  Consumed by the game-over screen to show the
+    /// "NEW RECORD!" banner.  Cleared on every game reset.
+    pub is_new_record: bool,
 }
 
 impl Default for GameState {
@@ -28,6 +32,7 @@ impl Default for GameState {
             score: 0,
             highscore: 0,
             elapsed_time: 0.0,
+            is_new_record: false,
         }
     }
 }

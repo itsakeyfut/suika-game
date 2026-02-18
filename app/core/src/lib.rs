@@ -97,6 +97,9 @@ pub mod prelude {
     // Score
     pub use crate::systems::score::combo_multiplier;
 
+    // System sets
+    pub use crate::systems::game_over::GameOverSet;
+
     // Effects
     pub use crate::systems::effects::MergeAnimation;
     pub use crate::systems::effects::bounce::SquashStretchAnimation;
@@ -238,10 +241,14 @@ impl Plugin for GameCorePlugin {
                 .run_if(in_state(states::AppState::Playing)),
         );
 
-        // Phase 6: highscore persistence on game over
+        // Phase 6: highscore persistence on game over.
+        // Registered inside GameOverSet::SaveHighscore so that other crates
+        // (e.g. UI) can order their OnEnter(GameOver) systems after this set
+        // and safely read GameState::is_new_record / highscore.
         app.add_systems(
             OnEnter(states::AppState::GameOver),
-            systems::game_over::save_highscore_on_game_over,
+            systems::game_over::save_highscore_on_game_over
+                .in_set(systems::game_over::GameOverSet::SaveHighscore),
         );
 
         // Phase 6: full game reset on (re)entering Playing state
