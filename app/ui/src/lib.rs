@@ -5,6 +5,7 @@
 use bevy::prelude::*;
 use suika_game_core::prelude::AppState;
 
+pub mod camera;
 pub mod components;
 pub mod config;
 pub mod screens;
@@ -23,7 +24,8 @@ impl Plugin for GameUIPlugin {
         // Background color comes from the UI style palette
         app.insert_resource(ClearColor(styles::BG_COLOR));
 
-        app.init_resource::<components::KeyboardFocusIndex>()
+        app.add_systems(Startup, camera::setup_camera)
+            .init_resource::<components::KeyboardFocusIndex>()
             // Title screen
             .add_systems(OnEnter(AppState::Title), screens::title::setup_title_screen)
             // HUD: spawn layout on enter Playing, run widget updates each frame

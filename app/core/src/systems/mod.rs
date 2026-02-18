@@ -5,6 +5,7 @@
 
 pub mod boundary;
 pub mod collision;
+pub mod container;
 pub mod effects;
 pub mod game_over;
 pub mod input;

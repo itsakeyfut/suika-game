@@ -6,10 +6,10 @@
 //! Supports hot-reloading: Edit config files while the game is running
 //! and changes will be applied automatically.
 
+use crate::states::AppState;
 use bevy::asset::io::Reader;
 use bevy::asset::{Asset, AssetLoader, LoadContext};
 use bevy::prelude::*;
-use crate::states::AppState;
 use bevy_rapier2d::prelude::{
     Collider, ColliderMassProperties, DefaultRapierContext, Friction, RapierConfiguration,
     Restitution,
@@ -286,10 +286,7 @@ impl Plugin for GameConfigPlugin {
         );
 
         // Transition Loading → Title once all required configs are ready
-        app.add_systems(
-            Update,
-            wait_for_configs.run_if(in_state(AppState::Loading)),
-        );
+        app.add_systems(Update, wait_for_configs.run_if(in_state(AppState::Loading)));
 
         info!("✅ GameConfigPlugin initialized");
         info!(
@@ -305,6 +302,7 @@ impl Plugin for GameConfigPlugin {
 /// As soon as all three are available the state machine advances to `Title` so
 /// the rest of the game — including `setup_container` via `OnExit(Loading)` —
 /// can use fully-loaded values instead of fallbacks.
+#[allow(clippy::too_many_arguments)]
 fn wait_for_configs(
     physics_handle: Res<PhysicsConfigHandle>,
     physics_assets: Res<Assets<PhysicsConfig>>,
@@ -327,7 +325,9 @@ fn wait_for_configs(
         && droplet_assets.get(&droplet_handle.0).is_some()
         && flash_assets.get(&flash_handle.0).is_some()
     {
-        info!("✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash), transitioning to Title");
+        info!(
+            "✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash), transitioning to Title"
+        );
         next_state.set(AppState::Title);
     }
 }

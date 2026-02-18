@@ -51,8 +51,7 @@ fn test_resources_available() {
     let _game_over_timer = GameOverTimer::default();
     let _next_fruit = NextFruitType::default();
 
-    // If we got here, all resources can be created
-    assert!(true, "All game resources are available");
+    // If we got here without panicking, all resources can be created
 }
 
 #[test]
@@ -77,6 +76,5 @@ fn test_physics_configuration() {
     app.add_plugins(MinimalPlugins);
     app.add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0));
 
-    // Should initialize without panicking
-    assert!(true, "Physics plugin initialized successfully");
+    // If we got here without panicking, the plugin initialized successfully
 }
