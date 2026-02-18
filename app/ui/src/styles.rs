@@ -55,6 +55,22 @@ pub const FONT_SIZE_MEDIUM: f32 = 32.0;
 pub const FONT_SIZE_SMALL: f32 = 24.0;
 
 // ---------------------------------------------------------------------------
+// Button sizes
+// ---------------------------------------------------------------------------
+
+/// Width of a large button (px) — used for primary actions like Start/Retry.
+pub const BUTTON_LARGE_WIDTH: f32 = 240.0;
+
+/// Height of a large button (px) — used for primary actions like Start/Retry.
+pub const BUTTON_LARGE_HEIGHT: f32 = 80.0;
+
+/// Width of a medium button (px) — used for secondary actions.
+pub const BUTTON_MEDIUM_WIDTH: f32 = 200.0;
+
+/// Height of a medium button (px) — used for secondary actions.
+pub const BUTTON_MEDIUM_HEIGHT: f32 = 60.0;
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
