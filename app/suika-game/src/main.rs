@@ -52,44 +52,29 @@ fn main() {
                 setup_container,
                 load_highscore_system,
                 setup_fruit_preview,
-                // Immediately transition to Playing so Phase 6 boundary/game-over
-                // systems (gated to AppState::Playing) begin running.
-                // Phase 7 will replace this with a proper title screen flow.
-                start_playing,
             ),
         )
-        // Update systems (run every frame)
+        // Gameplay systems — only run while actively playing
         .add_systems(
             Update,
             (
                 update_spawn_position,
-                update_fruit_preview, // Runs independently (fixed position)
+                update_fruit_preview,
                 handle_fruit_drop_input.after(update_spawn_position),
                 detect_fruit_landing,
                 spawn_held_fruit.after(detect_fruit_landing),
-            ),
+            )
+                .run_if(in_state(AppState::Playing)),
         )
         .run();
 }
 
-/// Immediately transitions to `AppState::Playing` on game start.
+/// Loads the highscore from disk at startup.
 ///
-/// This is a temporary measure until Phase 7 implements the title screen.
-/// Without it the game stays in `AppState::Title` and the Phase 6 boundary /
-/// game-over systems (which are gated to `Playing`) never run.
-fn start_playing(mut next_state: ResMut<NextState<AppState>>) {
-    next_state.set(AppState::Playing);
-    info!("Starting game directly in Playing state (Phase 7 will add title screen)");
-}
-
-/// Loads the highscore from disk at startup
-///
-/// This system runs once during app initialization and loads the
-/// saved highscore into the GameState resource.
+/// Runs once during app initialization and populates [`GameState::highscore`]
+/// so the title screen can display the current best score immediately.
 fn load_highscore_system(mut game_state: ResMut<GameState>) {
     let highscore_data = load_highscore(std::path::Path::new(constants::storage::SAVE_DIR));
-
     game_state.highscore = highscore_data.highscore;
-
     info!("Highscore loaded from disk: {}", highscore_data.highscore);
 }

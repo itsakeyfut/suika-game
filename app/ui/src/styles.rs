@@ -71,6 +71,15 @@ pub const BUTTON_MEDIUM_WIDTH: f32 = 200.0;
 pub const BUTTON_MEDIUM_HEIGHT: f32 = 60.0;
 
 // ---------------------------------------------------------------------------
+// Font paths
+// ---------------------------------------------------------------------------
+
+/// Path to the default Japanese pixel font (DotGothic16).
+///
+/// Relative to the `assets/` directory; pass to [`AssetServer::load`].
+pub const FONT_JP: &str = "fonts/DotGothic16/DotGothic16-Regular.ttf";
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
