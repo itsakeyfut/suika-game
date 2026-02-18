@@ -198,7 +198,12 @@ pub fn spawn_menu_button(
 /// [`KeyboardFocusIndex`].
 pub fn handle_button_interaction(
     mut interaction_query: Query<
-        (&Interaction, &MenuButton, &ButtonIndex, &mut BackgroundColor),
+        (
+            &Interaction,
+            &MenuButton,
+            &ButtonIndex,
+            &mut BackgroundColor,
+        ),
         Changed<Interaction>,
     >,
     focus: Res<KeyboardFocusIndex>,

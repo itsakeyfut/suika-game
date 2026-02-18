@@ -1,6 +1,9 @@
 //! Game-over and game-reset systems
 //!
-//! This module provides two lifecycle systems:
+//! This module provides three lifecycle systems:
+//!
+//! - `tick_elapsed_time` — runs every frame during `AppState::Playing`.
+//!   Increments [`GameState::elapsed_time`] so the HUD can display a live timer.
 //!
 //! - `save_highscore_on_game_over` — runs on `OnEnter(AppState::GameOver)`.
 //!   Compares the current score with the stored highscore and writes to disk
@@ -20,6 +23,14 @@ use crate::resources::{ComboTimer, GameOverTimer, GameState};
 // ---------------------------------------------------------------------------
 // Systems
 // ---------------------------------------------------------------------------
+
+/// Advances [`GameState::elapsed_time`] by the frame delta.
+///
+/// Should run every frame while `AppState::Playing` is active so the HUD
+/// timer and any other consumers always have an up-to-date value.
+pub fn tick_elapsed_time(mut game_state: ResMut<GameState>, time: Res<Time>) {
+    game_state.elapsed_time += time.delta_secs();
+}
 
 /// Saves the highscore to disk when the game ends.
 ///

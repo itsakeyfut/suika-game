@@ -15,7 +15,6 @@ use suika_game_core::prelude::*;
 use suika_game_core::systems::input::{
     detect_fruit_landing, handle_fruit_drop_input, spawn_held_fruit, update_spawn_position,
 };
-use suika_game_core::systems::preview::{setup_fruit_preview, update_fruit_preview};
 use suika_game_ui::GameUIPlugin;
 
 fn main() {
@@ -47,19 +46,13 @@ fn main() {
         // Startup systems
         .add_systems(
             Startup,
-            (
-                setup_camera,
-                setup_container,
-                load_highscore_system,
-                setup_fruit_preview,
-            ),
+            (setup_camera, setup_container, load_highscore_system),
         )
         // Gameplay systems — only run while actively playing
         .add_systems(
             Update,
             (
                 update_spawn_position,
-                update_fruit_preview,
                 handle_fruit_drop_input.after(update_spawn_position),
                 detect_fruit_landing,
                 spawn_held_fruit.after(detect_fruit_landing),

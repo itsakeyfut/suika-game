@@ -215,6 +215,12 @@ impl Plugin for GameCorePlugin {
             ),
         );
 
+        // Elapsed-time tick (Playing state only)
+        app.add_systems(
+            Update,
+            systems::game_over::tick_elapsed_time.run_if(in_state(states::AppState::Playing)),
+        );
+
         // Phase 6: boundary overflow detection and game-over transition
         // All three run only during active gameplay.
         app.add_systems(

@@ -7,3 +7,5 @@ edition.workspace = true
 bevy.workspace = true
 suika-game-core.workspace = true
 suika-game-assets.workspace = true
+ron.workspace = true
+serde.workspace = true
