@@ -60,13 +60,14 @@ fn test_app_state_definitions() {
     use suika_game_core::prelude::*;
 
     // Test that all app states are defined correctly
+    let _loading = AppState::Loading;
     let _title = AppState::Title;
     let _playing = AppState::Playing;
     let _paused = AppState::Paused;
     let _game_over = AppState::GameOver;
 
-    // Verify default state
-    assert_eq!(AppState::default(), AppState::Title);
+    // Verify default state (Loading is the initial state so configs load first)
+    assert_eq!(AppState::default(), AppState::Loading);
 }
 
 #[test]

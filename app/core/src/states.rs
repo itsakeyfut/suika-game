@@ -13,6 +13,7 @@ use bevy::prelude::*;
 ///
 /// # State Transitions
 ///
+/// - `Loading` → `Title`: All required RON configs have finished loading
 /// - `Title` → `Playing`: Player starts a new game
 /// - `Playing` → `Paused`: Player pauses the game
 /// - `Paused` → `Playing`: Player resumes the game
@@ -39,11 +40,18 @@ use bevy::prelude::*;
 /// ```
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum AppState {
+    /// Asset loading state
+    ///
+    /// The application waits here until all required RON config files have
+    /// finished loading.  Once ready, automatically transitions to `Title`.
+    /// The game world (container walls, etc.) is set up on exit from this
+    /// state so it always uses the values from the config files.
+    #[default]
+    Loading,
+
     /// Title screen state
     ///
     /// Displays the game title, menu options, and high score.
-    /// This is the initial state when the application starts.
-    #[default]
     Title,
 
     /// Active gameplay state
@@ -72,7 +80,7 @@ mod tests {
     #[test]
     fn test_app_state_default() {
         let state = AppState::default();
-        assert_eq!(state, AppState::Title);
+        assert_eq!(state, AppState::Loading);
     }
 
     #[test]
@@ -110,6 +118,7 @@ mod tests {
     fn test_app_state_all_variants() {
         // Ensure all variants are covered
         let states = vec![
+            AppState::Loading,
             AppState::Title,
             AppState::Playing,
             AppState::Paused,

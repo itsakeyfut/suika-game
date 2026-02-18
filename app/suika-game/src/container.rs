@@ -32,20 +32,18 @@ pub fn setup_container(
     physics_handle: Res<PhysicsConfigHandle>,
     physics_assets: Res<Assets<PhysicsConfig>>,
 ) {
-    // Get physics config, fallback to defaults if not loaded yet
-    let (container_width, container_height, wall_thickness, wall_restitution, wall_friction) =
-        if let Some(config) = physics_assets.get(&physics_handle.0) {
-            (
-                config.container_width,
-                config.container_height,
-                config.wall_thickness,
-                config.wall_restitution,
-                config.wall_friction,
-            )
-        } else {
-            warn!("Physics config not loaded yet, using fallback values");
-            (600.0, 800.0, 20.0, 0.2, 0.5)
-        };
+    // Physics config is guaranteed to be loaded because this system runs on
+    // OnExit(AppState::Loading), after wait_for_configs confirms all configs ready.
+    let config = physics_assets
+        .get(&physics_handle.0)
+        .expect("PhysicsConfig must be loaded before setup_container runs");
+    let (container_width, container_height, wall_thickness, wall_restitution, wall_friction) = (
+        config.container_width,
+        config.container_height,
+        config.wall_thickness,
+        config.wall_restitution,
+        config.wall_friction,
+    );
 
     // Calculate wall positions
     let half_width = container_width / 2.0;
@@ -115,11 +113,7 @@ pub fn setup_container(
     ));
 
     // Boundary line (game over line) - visual only, no physics
-    let boundary_y = if let Some(config) = physics_assets.get(&physics_handle.0) {
-        config.boundary_line_y
-    } else {
-        300.0 // Fallback
-    };
+    let boundary_y = config.boundary_line_y;
     let line_thickness = 3.0;
 
     commands.spawn((
@@ -270,13 +264,12 @@ mod tests {
         app.add_systems(Startup, setup_container);
         app.update();
 
-        // Verify boundary line Y position (default from fallback)
+        // Verify boundary line Y position matches the test config value
         let mut query = app.world_mut().query::<(&BoundaryLine, &Transform)>();
         for (_, transform) in query.iter(app.world()) {
-            // Using fallback value 300.0 since PhysicsConfig not loaded in test
             assert_eq!(
                 transform.translation.y, 300.0,
-                "Boundary line should be at default position"
+                "Boundary line Y should match physics config boundary_line_y"
             );
         }
     }
