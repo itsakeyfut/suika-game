@@ -52,7 +52,10 @@ fn main() {
                 setup_container,
                 load_highscore_system,
                 setup_fruit_preview,
-                spawn_held_fruit,
+                // Immediately transition to Playing so Phase 6 boundary/game-over
+                // systems (gated to AppState::Playing) begin running.
+                // Phase 7 will replace this with a proper title screen flow.
+                start_playing,
             ),
         )
         // Update systems (run every frame)
@@ -67,6 +70,16 @@ fn main() {
             ),
         )
         .run();
+}
+
+/// Immediately transitions to `AppState::Playing` on game start.
+///
+/// This is a temporary measure until Phase 7 implements the title screen.
+/// Without it the game stays in `AppState::Title` and the Phase 6 boundary /
+/// game-over systems (which are gated to `Playing`) never run.
+fn start_playing(mut next_state: ResMut<NextState<AppState>>) {
+    next_state.set(AppState::Playing);
+    info!("Starting game directly in Playing state (Phase 7 will add title screen)");
 }
 
 /// Loads the highscore from disk at startup

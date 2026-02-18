@@ -16,7 +16,7 @@ use bevy_rapier2d::prelude::{
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::components::{BottomWall, Container, Fruit, LeftWall, NextFruitPreview};
+use crate::components::{BottomWall, BoundaryLine, Container, Fruit, LeftWall, NextFruitPreview};
 
 /// Fruit configuration asset loaded from `assets/config/fruits.ron`
 ///
@@ -572,11 +572,15 @@ fn hot_reload_physics_config(
             Option<&BottomWall>,
             Option<&LeftWall>,
         ),
-        (With<Container>, Without<Fruit>),
+        (With<Container>, Without<Fruit>, Without<BoundaryLine>),
+    >,
+    mut boundary_query: Query<
+        &mut Transform,
+        (With<BoundaryLine>, Without<Container>, Without<Fruit>),
     >,
     fruits_query: Query<
         (Entity, &Transform, &crate::fruit::FruitType),
-        (With<Fruit>, Without<Container>),
+        (With<Fruit>, Without<Container>, Without<BoundaryLine>),
     >,
     fruits_config_handle: Res<FruitsConfigHandle>,
     fruits_config_assets: Res<Assets<FruitsConfig>>,
@@ -585,6 +589,17 @@ fn hot_reload_physics_config(
         match event {
             AssetEvent::Added { id: _ } => {
                 info!("✅ Physics config loaded");
+                // Apply the initial config to the boundary line, which may have been
+                // spawned with a fallback value before the asset finished loading.
+                if let Some(config) = config_assets.get(&config_handle.0)
+                    && let Ok(mut transform) = boundary_query.single_mut()
+                {
+                    transform.translation.y = config.boundary_line_y;
+                    info!(
+                        "📐 Boundary line positioned at y={} (initial load)",
+                        config.boundary_line_y
+                    );
+                }
             }
             AssetEvent::Modified { id: _ } => {
                 if let Some(config) = config_assets.get(&config_handle.0) {
@@ -650,6 +665,12 @@ fn hot_reload_physics_config(
                         "✨ Container walls updated to width={}, height={}",
                         config.container_width, config.container_height
                     );
+
+                    // Update boundary line position
+                    if let Ok(mut transform) = boundary_query.single_mut() {
+                        transform.translation.y = config.boundary_line_y;
+                        info!("📐 Boundary line updated to y={}", config.boundary_line_y);
+                    }
                 }
             }
             AssetEvent::Removed { id: _ } => {

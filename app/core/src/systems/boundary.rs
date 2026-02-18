@@ -1,13 +1,13 @@
-//! Boundary overflow detection and game-over warning effects
+//! Boundary overflow detection and game-over effects
 //!
-//! This module monitors whether any fruit has risen above the boundary line.
-//! When fruits stay above the line long enough, the game transitions to
-//! `AppState::GameOver`.  While in warning state the boundary line sprite
-//! blinks red to alert the player.
+//! This module monitors whether any in-play fruit has risen above the
+//! boundary line.  When the overflow condition persists for the warning
+//! threshold (default 0.5 s) the game transitions to `AppState::GameOver`.
+//! While in warning state the boundary line sprite blinks red.
 
 use bevy::prelude::*;
 
-use crate::components::{BoundaryLine, Fruit};
+use crate::components::{BoundaryLine, Fruit, FruitSpawnState};
 use crate::config::{PhysicsConfig, PhysicsConfigHandle};
 use crate::resources::GameOverTimer;
 use crate::states::AppState;
@@ -32,16 +32,19 @@ fn boundary_y(
 // Systems
 // ---------------------------------------------------------------------------
 
-/// Checks whether any fruit is above the boundary line and updates the timer.
+/// Checks whether any in-play fruit is above the boundary line.
 ///
-/// - If at least one fruit is above the line, the `GameOverTimer` advances and
-///   the warning flag is set.
-/// - If no fruits are above the line, the timer and warning flag are reset.
+/// `Held` fruits are excluded because they sit above the container top by
+/// design and must not trigger the warning.  Both `Falling` and `Landed`
+/// fruits are included so that fruits pushed upward by physics (which may
+/// never transition back to `Landed`) are still detected.
 ///
-/// The boundary Y position is read from `PhysicsConfig`; the default 300.0 is
-/// used while the asset loads.
+/// When overflow is detected the `GameOverTimer` advances.  The short
+/// threshold (0.5 s default) filters out the brief window when a newly
+/// dropped fruit passes through the boundary area before settling.
+/// When no overflow is detected the timer resets.
 pub fn check_boundary_overflow(
-    fruit_query: Query<&Transform, With<Fruit>>,
+    fruit_query: Query<(&Transform, &FruitSpawnState), With<Fruit>>,
     mut game_over_timer: ResMut<GameOverTimer>,
     time: Res<Time>,
     physics_handle: Option<Res<PhysicsConfigHandle>>,
@@ -49,7 +52,11 @@ pub fn check_boundary_overflow(
 ) {
     let threshold = boundary_y(physics_handle.as_ref(), physics_assets.as_ref());
 
-    let any_overflow = fruit_query.iter().any(|t| t.translation.y > threshold);
+    // Held fruits sit above the drop zone by design — exclude them only.
+    let any_overflow = fruit_query
+        .iter()
+        .filter(|(_, state)| **state != FruitSpawnState::Held)
+        .any(|(t, _)| t.translation.y > threshold);
 
     if any_overflow {
         game_over_timer.tick_warning(time.delta_secs());
@@ -60,7 +67,7 @@ pub fn check_boundary_overflow(
 
 /// Transitions to `AppState::GameOver` when the timer exceeds its threshold.
 ///
-/// Only fires from `AppState::Playing` and guards against double-triggering.
+/// Only fires from `AppState::Playing` to guard against double-triggering.
 pub fn trigger_game_over(
     game_over_timer: Res<GameOverTimer>,
     current_state: Res<State<AppState>>,
@@ -71,10 +78,7 @@ pub fn trigger_game_over(
     }
 
     if game_over_timer.is_game_over() {
-        info!(
-            "Game Over! Fruit exceeded boundary for {:.2}s",
-            game_over_timer.time_over_boundary
-        );
+        info!("Game Over! Fruit exceeded boundary line.");
         next_state.set(AppState::GameOver);
     }
 }
@@ -90,7 +94,7 @@ pub fn animate_boundary_warning(
 ) {
     for mut sprite in boundary_query.iter_mut() {
         if game_over_timer.is_warning {
-            // Smooth sine-based blink at ~2 Hz (visible even at low frame rates)
+            // Smooth sine-based blink at ~2 Hz
             let blink = (time.elapsed_secs() * 4.0).sin();
             let alpha = 0.4 + 0.4 * blink; // range [0.0, 0.8]
             sprite.color = Color::srgba(1.0, 0.0, 0.0, alpha);
@@ -114,14 +118,14 @@ mod tests {
         let mut timer = GameOverTimer::default();
         assert!(!timer.is_game_over());
 
-        timer.tick_warning(3.0);
+        timer.tick_warning(0.5);
         assert!(timer.is_game_over());
     }
 
     #[test]
     fn test_game_over_timer_resets() {
         let mut timer = GameOverTimer::default();
-        timer.tick_warning(2.0);
+        timer.tick_warning(0.3);
         assert!(timer.is_warning);
 
         timer.reset();
