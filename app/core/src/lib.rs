@@ -191,8 +191,7 @@ impl Plugin for GameCorePlugin {
             Update,
             (
                 // Merge scale animation
-                systems::effects::animate_merge_scale
-                    .after(systems::merge::handle_fruit_merge),
+                systems::effects::animate_merge_scale.after(systems::merge::handle_fruit_merge),
                 // Squash-and-stretch bounce
                 systems::effects::bounce::animate_squash_stretch
                     .after(systems::merge::handle_fruit_merge),

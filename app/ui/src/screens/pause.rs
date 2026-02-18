@@ -21,8 +21,8 @@ use suika_game_core::prelude::AppState;
 
 use crate::components::{ButtonAction, KeyboardFocusIndex, spawn_button};
 use crate::styles::{
-    BUTTON_LARGE_HEIGHT, BUTTON_LARGE_WIDTH, BUTTON_MEDIUM_HEIGHT, BUTTON_MEDIUM_WIDTH,
-    FONT_JP, FONT_SIZE_LARGE, FONT_SIZE_MEDIUM,
+    BUTTON_LARGE_HEIGHT, BUTTON_LARGE_WIDTH, BUTTON_MEDIUM_HEIGHT, BUTTON_MEDIUM_WIDTH, FONT_JP,
+    FONT_SIZE_LARGE, FONT_SIZE_MEDIUM,
 };
 
 // ---------------------------------------------------------------------------
@@ -143,12 +143,18 @@ mod tests {
     #[test]
     fn test_overlay_color_is_semi_transparent() {
         let a = OVERLAY_COLOR.to_srgba().alpha;
-        assert!(a > 0.0 && a < 1.0, "overlay should be semi-transparent, got alpha {a}");
+        assert!(
+            a > 0.0 && a < 1.0,
+            "overlay should be semi-transparent, got alpha {a}"
+        );
     }
 
     #[test]
     fn test_paused_text_color_is_opaque() {
         let a = PAUSED_TEXT_COLOR.to_srgba().alpha;
-        assert!((a - 1.0).abs() < f32::EPSILON, "paused text should be fully opaque");
+        assert!(
+            (a - 1.0).abs() < f32::EPSILON,
+            "paused text should be fully opaque"
+        );
     }
 }

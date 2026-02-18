@@ -43,8 +43,7 @@ impl Plugin for GameUIPlugin {
             // that GameState::is_new_record and highscore are up-to-date.
             .add_systems(
                 OnEnter(AppState::GameOver),
-                screens::game_over::setup_game_over_screen
-                    .after(GameOverSet::SaveHighscore),
+                screens::game_over::setup_game_over_screen.after(GameOverSet::SaveHighscore),
             )
             // Pause menu
             .add_systems(OnEnter(AppState::Paused), screens::pause::setup_pause_menu)
