@@ -153,6 +153,9 @@ impl Plugin for GameCorePlugin {
             .init_resource::<systems::input::InputMode>()
             .init_resource::<systems::input::LastCursorPosition>();
 
+        // Load persisted highscore into GameState at startup
+        app.add_systems(Startup, persistence::load_highscore_startup);
+
         // Register events
         app.add_message::<events::FruitMergeEvent>();
 
@@ -245,6 +248,25 @@ impl Plugin for GameCorePlugin {
         app.add_systems(
             OnEnter(states::AppState::Playing),
             systems::game_over::reset_game_state,
+        );
+
+        // Spawn the physics container walls once all configs are loaded
+        app.add_systems(
+            OnExit(states::AppState::Loading),
+            systems::container::setup_container,
+        );
+
+        // Gameplay input systems — only active while Playing
+        app.add_systems(
+            Update,
+            (
+                systems::input::update_spawn_position,
+                systems::input::handle_fruit_drop_input
+                    .after(systems::input::update_spawn_position),
+                systems::input::detect_fruit_landing,
+                systems::input::spawn_held_fruit.after(systems::input::detect_fruit_landing),
+            )
+                .run_if(in_state(states::AppState::Playing)),
         );
     }
 }

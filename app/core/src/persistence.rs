@@ -3,10 +3,17 @@
 //! This module handles saving and loading the player's highscore
 //! to/from a JSON file on disk. The highscore persists across
 //! game sessions.
+//!
+//! Also exposes [`load_highscore_startup`], a Bevy startup system that reads
+//! the persisted highscore into [`GameState`] once at launch.
 
+use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+
+use crate::constants::storage::SAVE_DIR;
+use crate::resources::GameState;
 
 /// Highscore data structure
 ///
@@ -147,6 +154,17 @@ pub fn update_highscore(
     } else {
         Ok(false)
     }
+}
+
+/// Bevy startup system: reads the persisted highscore into [`GameState`].
+///
+/// Runs once at [`Startup`] so every screen that shows the best score
+/// (title screen, HUD, game-over screen) always has the correct value
+/// from the very first frame.
+pub fn load_highscore_startup(mut game_state: ResMut<GameState>) {
+    let data = load_highscore(std::path::Path::new(SAVE_DIR));
+    game_state.highscore = data.highscore;
+    info!("Highscore loaded: {}", data.highscore);
 }
 
 #[cfg(test)]

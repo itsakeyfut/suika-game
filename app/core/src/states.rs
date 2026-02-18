@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn test_app_state_all_variants() {
         // Ensure all variants are covered
-        let states = vec![
+        let states = [
             AppState::Loading,
             AppState::Title,
             AppState::Playing,
