@@ -186,39 +186,28 @@ impl Plugin for GameCorePlugin {
             systems::score::tick_combo_timer.after(systems::score::update_score_on_merge),
         );
 
-        // Merge animation (runs after merge so newly spawned fruits are animated)
-        app.add_systems(
-            Update,
-            systems::effects::animate_merge_scale.after(systems::merge::handle_fruit_merge),
-        );
-
-        // Squash-and-stretch bounce (SpawnIn from merge + Impact from landing)
-        app.add_systems(
-            Update,
-            systems::effects::bounce::animate_squash_stretch
-                .after(systems::merge::handle_fruit_merge),
-        );
-
-        // Water droplet particles: spawn on merge, spawn on landing, update physics
+        // Visual effects — all gated on Playing so they freeze during Paused.
         app.add_systems(
             Update,
             (
+                // Merge scale animation
+                systems::effects::animate_merge_scale
+                    .after(systems::merge::handle_fruit_merge),
+                // Squash-and-stretch bounce
+                systems::effects::bounce::animate_squash_stretch
+                    .after(systems::merge::handle_fruit_merge),
+                // Water droplet particles
                 systems::effects::droplet::spawn_merge_droplets
                     .after(systems::merge::handle_fruit_merge),
                 systems::effects::droplet::handle_fruit_landing,
                 systems::effects::droplet::update_water_droplets,
-            ),
-        );
-
-        // Flash effects: spawn on merge, animate local and screen flashes
-        app.add_systems(
-            Update,
-            (
+                // Flash effects
                 systems::effects::flash::spawn_merge_flash
                     .after(systems::merge::handle_fruit_merge),
                 systems::effects::flash::animate_local_flash,
                 systems::effects::flash::animate_screen_flash,
-            ),
+            )
+                .run_if(in_state(states::AppState::Playing)),
         );
 
         // Elapsed-time tick (Playing state only)
@@ -251,10 +240,31 @@ impl Plugin for GameCorePlugin {
                 .in_set(systems::game_over::GameOverSet::SaveHighscore),
         );
 
-        // Phase 6: full game reset on (re)entering Playing state
+        // Reset game state in two places to cover all "new game" entry paths
+        // while NOT resetting on Paused → Playing (resume):
+        //   • OnExit(GameOver)  — GameOver → Playing  /  GameOver → Title → Playing
+        //   • OnExit(Title)     — Title → Playing  /  (Paused → Title → Playing)
+        // Paused → Playing never passes through either of these, so the current
+        // session is preserved on resume.
         app.add_systems(
-            OnEnter(states::AppState::Playing),
+            OnExit(states::AppState::GameOver),
             systems::game_over::reset_game_state,
+        );
+        app.add_systems(
+            OnExit(states::AppState::Title),
+            systems::game_over::reset_game_state,
+        );
+
+        // Pause / resume: freeze the physics pipeline while paused.
+        // All gameplay input and scoring systems already gate on Playing, so
+        // this is the only change needed to fully suspend the simulation.
+        app.add_systems(
+            OnEnter(states::AppState::Paused),
+            systems::pause::pause_physics,
+        );
+        app.add_systems(
+            OnExit(states::AppState::Paused),
+            systems::pause::resume_physics,
         );
 
         // Spawn the physics container walls once all configs are loaded

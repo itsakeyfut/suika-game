@@ -10,6 +10,7 @@ pub mod effects;
 pub mod game_over;
 pub mod input;
 pub mod merge;
+pub mod pause;
 pub mod preview;
 pub mod score;
 pub mod spawn;

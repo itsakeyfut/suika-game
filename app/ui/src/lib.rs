@@ -46,6 +46,10 @@ impl Plugin for GameUIPlugin {
                 screens::game_over::setup_game_over_screen
                     .after(GameOverSet::SaveHighscore),
             )
+            // Pause menu
+            .add_systems(OnEnter(AppState::Paused), screens::pause::setup_pause_menu)
+            // ESC toggles Playing ↔ Paused (runs every frame, ignores other states)
+            .add_systems(Update, screens::pause::toggle_pause)
             // Button interaction (all states)
             .add_systems(
                 Update,
