@@ -234,6 +234,30 @@ pub struct FlashConfig {
 #[derive(Resource)]
 pub struct FlashConfigHandle(pub Handle<FlashConfig>);
 
+/// Camera shake effect configuration
+///
+/// Loaded from `assets/config/effects/shake.ron`.
+/// Controls trauma accumulation, decay, and maximum camera displacement.
+///
+/// The shake uses a "trauma" model: each large merge adds trauma (0–1),
+/// which decays per second. Camera displacement scales with `trauma²`.
+#[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+pub struct ShakeConfig {
+    /// Trauma lost per second (higher = faster decay / shorter shake)
+    pub decay: f32,
+    /// Maximum camera displacement in pixels when `trauma = 1.0`
+    pub max_offset: f32,
+    /// Minimum fruit index (0-based) that triggers a shake.
+    /// Index 5 = Apple. Fruits below this threshold cause no shake.
+    pub min_fruit_index: usize,
+    /// Trauma added per fruit-index step above `min_fruit_index`
+    pub intensity_step: f32,
+}
+
+/// Resource holding the handle to the loaded shake configuration
+#[derive(Resource)]
+pub struct ShakeConfigHandle(pub Handle<ShakeConfig>);
+
 /// Plugin for game configuration management
 pub struct GameConfigPlugin;
 
@@ -253,7 +277,9 @@ impl Plugin for GameConfigPlugin {
             .init_asset::<DropletConfig>()
             .register_asset_loader(DropletConfigLoader)
             .init_asset::<FlashConfig>()
-            .register_asset_loader(FlashConfigLoader);
+            .register_asset_loader(FlashConfigLoader)
+            .init_asset::<ShakeConfig>()
+            .register_asset_loader(ShakeConfigLoader);
 
         // Load all configs and insert handles immediately
         let asset_server = app.world_mut().resource::<AssetServer>();
@@ -264,13 +290,15 @@ impl Plugin for GameConfigPlugin {
         let bounce_handle: Handle<BounceConfig> = asset_server.load("config/effects/bounce.ron");
         let droplet_handle: Handle<DropletConfig> = asset_server.load("config/effects/droplet.ron");
         let flash_handle: Handle<FlashConfig> = asset_server.load("config/effects/flash.ron");
+        let shake_handle: Handle<ShakeConfig> = asset_server.load("config/effects/shake.ron");
 
         app.insert_resource(FruitsConfigHandle(fruits_handle))
             .insert_resource(PhysicsConfigHandle(physics_handle))
             .insert_resource(GameRulesConfigHandle(game_rules_handle))
             .insert_resource(BounceConfigHandle(bounce_handle))
             .insert_resource(DropletConfigHandle(droplet_handle))
-            .insert_resource(FlashConfigHandle(flash_handle));
+            .insert_resource(FlashConfigHandle(flash_handle))
+            .insert_resource(ShakeConfigHandle(shake_handle));
 
         // Add hot-reload systems (run in all states so live-edit always works)
         app.add_systems(
@@ -282,6 +310,7 @@ impl Plugin for GameConfigPlugin {
                 hot_reload_bounce_config,
                 hot_reload_droplet_config,
                 hot_reload_flash_config,
+                hot_reload_shake_config,
             ),
         );
 
@@ -290,7 +319,7 @@ impl Plugin for GameConfigPlugin {
 
         info!("✅ GameConfigPlugin initialized");
         info!(
-            "🔍 All configs load requested (fruits, physics, game_rules, bounce, droplet, flash)"
+            "🔍 All configs load requested (fruits, physics, game_rules, bounce, droplet, flash, shake)"
         );
     }
 }
@@ -316,6 +345,8 @@ fn wait_for_configs(
     droplet_assets: Res<Assets<DropletConfig>>,
     flash_handle: Res<FlashConfigHandle>,
     flash_assets: Res<Assets<FlashConfig>>,
+    shake_handle: Res<ShakeConfigHandle>,
+    shake_assets: Res<Assets<ShakeConfig>>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     if physics_assets.get(&physics_handle.0).is_some()
@@ -324,9 +355,10 @@ fn wait_for_configs(
         && bounce_assets.get(&bounce_handle.0).is_some()
         && droplet_assets.get(&droplet_handle.0).is_some()
         && flash_assets.get(&flash_handle.0).is_some()
+        && shake_assets.get(&shake_handle.0).is_some()
     {
         info!(
-            "✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash), transitioning to Title"
+            "✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash, shake), transitioning to Title"
         );
         next_state.set(AppState::Title);
     }
@@ -816,6 +848,7 @@ fn hot_reload_game_rules_config(
 ron_asset_loader!(BounceConfigLoader, BounceConfig);
 ron_asset_loader!(DropletConfigLoader, DropletConfig);
 ron_asset_loader!(FlashConfigLoader, FlashConfig);
+ron_asset_loader!(ShakeConfigLoader, ShakeConfig);
 
 // ---------------------------------------------------------------------------
 // Effect config hot-reload systems
@@ -896,6 +929,33 @@ fn hot_reload_flash_config(
             }
             AssetEvent::Removed { id: _ } => {
                 warn!("⚠️ Flash effect config removed");
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Handles hot-reloading of shake effect configuration
+fn hot_reload_shake_config(
+    mut events: MessageReader<AssetEvent<ShakeConfig>>,
+    config_assets: Res<Assets<ShakeConfig>>,
+    config_handle: Res<ShakeConfigHandle>,
+) {
+    for event in events.read() {
+        match event {
+            AssetEvent::Added { id: _ } => {
+                info!("✅ Shake effect config loaded");
+            }
+            AssetEvent::Modified { id: _ } => {
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    info!(
+                        "🔥 Hot-reloading shake config! decay={}, max_offset={}, min_fruit_index={}",
+                        config.decay, config.max_offset, config.min_fruit_index
+                    );
+                }
+            }
+            AssetEvent::Removed { id: _ } => {
+                warn!("⚠️ Shake effect config removed");
             }
             _ => {}
         }
@@ -1130,5 +1190,22 @@ FlashConfig(
         assert_eq!(config.local_duration, 0.3);
         assert_eq!(config.local_initial_alpha, 0.6);
         assert_eq!(config.screen_flash_min_index, 8);
+    }
+
+    #[test]
+    fn test_shake_config_deserialization() {
+        let ron_data = r#"
+ShakeConfig(
+    decay: 5.0,
+    max_offset: 15.0,
+    min_fruit_index: 5,
+    intensity_step: 0.15,
+)
+"#;
+        let config: ShakeConfig = ron::de::from_str(ron_data).unwrap();
+        assert_eq!(config.decay, 5.0);
+        assert_eq!(config.max_offset, 15.0);
+        assert_eq!(config.min_fruit_index, 5);
+        assert!((config.intensity_step - 0.15).abs() < f32::EPSILON);
     }
 }
