@@ -1,5 +1,6 @@
 // Watermelon special effect configuration
-// Fired when two Watermelons merge (the final evolution stage).
+// Fired on Watermelon-related merges: when two Melons merge (Watermelon
+// birth) and when two Watermelons merge (Watermelon vanish).
 //
 // Hot-reload enabled: Edit this file while the game is running!
 //
