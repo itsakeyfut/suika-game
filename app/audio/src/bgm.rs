@@ -77,13 +77,13 @@ pub fn desired_track(state: &AppState) -> BgmTrack {
 
 /// Switches BGM whenever [`AppState`] transitions to a new track.
 ///
-/// Register this with `.run_if(state_changed::<AppState>())` to avoid polling
+/// Register this with `.run_if(state_changed::<AppState>)` to avoid polling
 /// every frame:
 ///
 /// ```rust,ignore
 /// app.add_systems(
 ///     Update,
-///     bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>()),
+///     bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
 /// );
 /// ```
 ///
