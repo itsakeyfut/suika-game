@@ -117,7 +117,7 @@ pub fn spawn_score_popups(
         .unwrap_or(&default_popup);
 
     let font: Handle<Font> = asset_server.load(FONT_JP);
-    let fade_start = popup_cfg.duration * popup_cfg.fade_start_fraction;
+    let fade_start = popup_cfg.duration * popup_cfg.fade_start_fraction.clamp(0.0, 1.0);
 
     for event in score_events.read() {
         // Font size scales with the resulting fruit's radius
