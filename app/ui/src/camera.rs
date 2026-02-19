@@ -5,12 +5,16 @@
 //! available from the very first frame, before any state transitions occur.
 
 use bevy::prelude::*;
+use suika_game_core::prelude::CameraShake;
 
 /// Spawns the orthographic camera used to render the game world.
 ///
 /// The camera is positioned on the Z axis so that all sprites with
 /// `z < 999.9` are visible.  The orthographic scale is `1.0`, meaning
 /// one world unit equals one logical pixel.
+///
+/// A [`CameraShake`] component is attached so that the core shake system can
+/// apply trauma-based offsets to this camera when fruits merge.
 pub fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera2d,
@@ -19,6 +23,7 @@ pub fn setup_camera(mut commands: Commands) {
             scale: 1.0,
             ..OrthographicProjection::default_2d()
         }),
+        CameraShake::default(),
     ));
 
     info!("Camera initialized");

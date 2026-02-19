@@ -1,0 +1,22 @@
+// Camera shake effect configuration
+// Uses a "trauma" model: each large merge adds trauma (0–1) that decays
+// over time. Camera displacement = trauma² × max_offset.
+//
+// Hot-reload enabled: Edit this file while the game is running!
+//
+//   decay           - Trauma lost per second. Higher = shorter shake.
+//                     Recommended range: 3.0 – 10.0
+//   max_offset      - Maximum camera displacement in pixels at trauma = 1.0.
+//                     Recommended range: 8.0 – 25.0
+//   min_fruit_index - Minimum fruit index (0-based) that triggers a shake.
+//                     0=Cherry … 5=Apple … 10=Watermelon
+//                     Fruits below this index cause no shake.
+//   intensity_step  - Trauma added per index step above min_fruit_index.
+//                     e.g. at 0.15: Apple adds 0.15, Pear 0.30 … Watermelon 0.90
+
+ShakeConfig(
+    decay: 3.5,
+    max_offset: 12.0,
+    min_fruit_index: 4,
+    intensity_step: 0.2,
+)

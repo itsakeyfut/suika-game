@@ -86,6 +86,7 @@ pub mod prelude {
         BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, FlashConfig,
         FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin,
         GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle, RonColor,
+        ShakeConfig, ShakeConfigHandle,
     };
 
     // Events
@@ -105,6 +106,7 @@ pub mod prelude {
     pub use crate::systems::effects::bounce::SquashStretchAnimation;
     pub use crate::systems::effects::droplet::{DropletColorMode, WaterDroplet};
     pub use crate::systems::effects::flash::{LocalFlashAnimation, ScreenFlashAnimation};
+    pub use crate::systems::effects::shake::CameraShake;
 
     // Plugin
     pub use crate::GameCorePlugin;
@@ -205,9 +207,15 @@ impl Plugin for GameCorePlugin {
                     .after(systems::merge::handle_fruit_merge),
                 systems::effects::flash::animate_local_flash,
                 systems::effects::flash::animate_screen_flash,
+                // Camera shake — trauma accumulates on merge (Playing only)
+                systems::effects::shake::add_camera_shake.after(systems::merge::handle_fruit_merge),
             )
                 .run_if(in_state(states::AppState::Playing)),
         );
+
+        // Camera shake apply runs every frame (not gated on Playing) so that
+        // trauma decays and the camera snaps back even while Paused or in GameOver.
+        app.add_systems(Update, systems::effects::shake::apply_camera_shake);
 
         // Elapsed-time tick (Playing state only)
         app.add_systems(
