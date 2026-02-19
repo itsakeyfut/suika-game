@@ -12,7 +12,7 @@
 //                     0=Cherry … 5=Apple … 10=Watermelon
 //                     Fruits below this index cause no shake.
 //   intensity_step  - Trauma added per index step above min_fruit_index.
-//                     e.g. at 0.15: Apple adds 0.15, Pear 0.30 … Watermelon 0.90
+//                     e.g. at 0.20: Persimmon adds 0.20, Apple 0.40 … Watermelon 1.40 (clamped to 1.0)
 
 ShakeConfig(
     decay: 3.5,
