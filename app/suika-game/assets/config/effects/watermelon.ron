@@ -1,0 +1,27 @@
+// Watermelon special effect configuration
+// Fired when two Watermelons merge (the final evolution stage).
+//
+// Hot-reload enabled: Edit this file while the game is running!
+//
+//   ring_duration          - How long the shockwave ring expands (seconds)
+//   ring_initial_diameter  - Starting diameter of the ring in pixels
+//   ring_expand_multiplier - How many times larger the ring grows
+//   ring_initial_alpha     - Starting opacity of the ring (0.0–1.0)
+//
+//   burst_count            - Number of burst particles spawned
+//   burst_min_speed        - Minimum initial particle speed (pixels/second)
+//   burst_max_speed        - Maximum initial particle speed (pixels/second)
+//   burst_particle_size    - Visual diameter of each particle in pixels
+//   burst_lifetime         - Maximum particle lifetime in seconds
+
+WatermelonConfig(
+    ring_duration: 0.7,
+    ring_initial_diameter: 160.0,
+    ring_expand_multiplier: 5.0,
+    ring_initial_alpha: 0.75,
+    burst_count: 48,
+    burst_min_speed: 150.0,
+    burst_max_speed: 500.0,
+    burst_particle_size: 5.0,
+    burst_lifetime: 0.9,
+)
