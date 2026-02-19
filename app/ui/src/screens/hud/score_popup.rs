@@ -20,7 +20,7 @@
 //! | 4+    | Rainbow (hue rotation)       |
 
 use bevy::prelude::*;
-use suika_game_core::prelude::{ComboTimer, FruitMergeEvent, FruitsConfig, FruitsConfigHandle};
+use suika_game_core::prelude::{FruitsConfig, FruitsConfigHandle, ScoreEarnedEvent};
 
 use crate::config::{ScorePopupConfig, ScorePopupConfigHandle};
 use crate::styles::FONT_JP;
@@ -85,19 +85,20 @@ pub fn color_for_combo(combo: u32) -> Color {
 // Systems
 // ---------------------------------------------------------------------------
 
-/// Spawns floating score popups when fruit merges occur.
+/// Spawns floating score popups when fruit merges are scored.
 ///
-/// Reads [`FruitMergeEvent`] each frame. For each event, calculates the
+/// Reads [`ScoreEarnedEvent`] each frame. For each event, calculates the
 /// font size from the resulting fruit's radius and spawns a [`Text2d`]
 /// entity with the [`ScorePopup`] component.
 ///
-/// Ordering: must run **after** `update_score_on_merge` so that
-/// [`ComboTimer::current_combo`] reflects the merge that triggered this popup.
-#[allow(clippy::too_many_arguments)]
+/// Each event carries the authoritative `earned_points` (after multiplier)
+/// and `combo_count` for that specific merge, so all popups in a frame
+/// correctly reflect their individual combo state.
+///
+/// Ordering: must run **after** `update_score_on_merge` which emits the events.
 pub fn spawn_score_popups(
     mut commands: Commands,
-    mut merge_events: MessageReader<FruitMergeEvent>,
-    combo_timer: Res<ComboTimer>,
+    mut score_events: MessageReader<ScoreEarnedEvent>,
     fruits_handle: Res<FruitsConfigHandle>,
     fruits_assets: Res<Assets<FruitsConfig>>,
     popup_handle: Option<Res<ScorePopupConfigHandle>>,
@@ -105,7 +106,7 @@ pub fn spawn_score_popups(
     asset_server: Res<AssetServer>,
 ) {
     let Some(fruits_cfg) = fruits_assets.get(&fruits_handle.0) else {
-        for _ in merge_events.read() {}
+        for _ in score_events.read() {}
         return;
     };
 
@@ -115,17 +116,9 @@ pub fn spawn_score_popups(
         .and_then(|h| popup_assets.get(&h.0))
         .unwrap_or(&default_popup);
 
-    let combo = combo_timer.current_combo;
     let font: Handle<Font> = asset_server.load(FONT_JP);
 
-    for event in merge_events.read() {
-        // Base points come from the merging fruit (not the result)
-        let base_points = event
-            .fruit_type
-            .try_parameters_from_config(fruits_cfg)
-            .map(|p| p.points)
-            .unwrap_or(0);
-
+    for event in score_events.read() {
         // Font size scales with the resulting fruit's radius
         let result_type = event.fruit_type.next().unwrap_or(event.fruit_type);
         let radius = result_type
@@ -134,10 +127,11 @@ pub fn spawn_score_popups(
             .unwrap_or(DEFAULT_FRUIT_RADIUS);
         let font_size = (radius * popup_cfg.font_size_per_radius).max(8.0);
 
+        let combo = event.combo_count;
         let text = if combo <= 1 {
-            format!("+{}", base_points)
+            format!("+{}", event.earned_points)
         } else {
-            format!("+{} ×{}", base_points, combo)
+            format!("+{} ×{}", event.earned_points, combo)
         };
 
         let initial_color = color_for_combo(combo);

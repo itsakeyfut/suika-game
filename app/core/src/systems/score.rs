@@ -26,7 +26,7 @@
 use bevy::prelude::*;
 
 use crate::config::{FruitsConfig, FruitsConfigHandle, GameRulesConfig, GameRulesConfigHandle};
-use crate::events::FruitMergeEvent;
+use crate::events::{FruitMergeEvent, ScoreEarnedEvent};
 use crate::resources::{ComboTimer, GameState};
 
 // ---------------------------------------------------------------------------
@@ -86,17 +86,20 @@ pub fn combo_multiplier(combo: u32, rules: Option<&GameRulesConfig>) -> f32 {
     }
 }
 
-/// Updates score and combo state in response to `FruitMergeEvent`
+/// Updates score and combo state in response to `FruitMergeEvent`.
 ///
 /// For each merge event:
 /// 1. Registers the merge with `ComboTimer` (updates combo count and window)
 /// 2. Calculates base points from the merged fruit's config entry
 /// 3. Applies the combo multiplier from `GameRulesConfig::combo_bonuses`
 /// 4. Adds the result to `GameState.score`
+/// 5. Emits a `ScoreEarnedEvent` with the authoritative per-merge data
 ///
 /// If the fruits config is not yet loaded, events are drained silently.
+#[allow(clippy::too_many_arguments)]
 pub fn update_score_on_merge(
     mut merge_events: MessageReader<FruitMergeEvent>,
+    mut score_events: MessageWriter<ScoreEarnedEvent>,
     mut game_state: ResMut<GameState>,
     mut combo_timer: ResMut<ComboTimer>,
     fruits_handle: Res<FruitsConfigHandle>,
@@ -140,6 +143,15 @@ pub fn update_score_on_merge(
                 earned, event.fruit_type, game_state.score
             );
         }
+
+        // Emit per-merge event so downstream systems (e.g. score popup) receive
+        // the authoritative earned points and combo count for this specific merge.
+        score_events.write(ScoreEarnedEvent {
+            position: event.position,
+            earned_points: earned,
+            combo_count: combo_timer.current_combo,
+            fruit_type: event.fruit_type,
+        });
     }
 }
 
@@ -179,6 +191,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.add_message::<FruitMergeEvent>();
+        app.add_message::<ScoreEarnedEvent>();
         app.add_systems(Update, update_score_on_merge);
         app.init_resource::<GameState>();
         app.init_resource::<ComboTimer>();

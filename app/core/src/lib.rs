@@ -90,7 +90,7 @@ pub mod prelude {
     };
 
     // Events
-    pub use crate::events::FruitMergeEvent;
+    pub use crate::events::{FruitMergeEvent, ScoreEarnedEvent};
 
     // Collision
     pub use crate::systems::collision::ProcessedCollisions;
@@ -166,6 +166,7 @@ impl Plugin for GameCorePlugin {
 
         // Register events
         app.add_message::<events::FruitMergeEvent>();
+        app.add_message::<events::ScoreEarnedEvent>();
 
         // Initialize collision detection resources
         app.init_resource::<systems::collision::ProcessedCollisions>();

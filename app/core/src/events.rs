@@ -10,6 +10,23 @@ use bevy::prelude::*;
 
 use crate::fruit::FruitType;
 
+/// Event emitted by the score system after a merge has been fully processed.
+///
+/// Carries the authoritative per-merge scoring data so that downstream systems
+/// (e.g. score popup) can display the correct earned points and combo count
+/// without re-computing them or reading shared resources.
+#[derive(Message, Debug, Clone)]
+pub struct ScoreEarnedEvent {
+    /// World position of the merge (for popup placement).
+    pub position: Vec2,
+    /// Actual points earned after applying the combo multiplier.
+    pub earned_points: u32,
+    /// Combo count at the moment this merge was scored.
+    pub combo_count: u32,
+    /// Fruit type that merged (used by the popup for font-size scaling).
+    pub fruit_type: FruitType,
+}
+
 /// Event triggered when two fruits of the same type collide and merge
 ///
 /// This event is sent by the collision detection system when it detects
