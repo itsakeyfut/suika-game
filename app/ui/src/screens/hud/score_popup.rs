@@ -117,6 +117,7 @@ pub fn spawn_score_popups(
         .unwrap_or(&default_popup);
 
     let font: Handle<Font> = asset_server.load(FONT_JP);
+    let fade_start = popup_cfg.duration * popup_cfg.fade_start_fraction;
 
     for event in score_events.read() {
         // Font size scales with the resulting fruit's radius
@@ -135,7 +136,6 @@ pub fn spawn_score_popups(
         };
 
         let initial_color = color_for_combo(combo);
-        let fade_start = popup_cfg.duration * popup_cfg.fade_start_fraction;
 
         commands.spawn((
             Text2d::new(text),
@@ -356,8 +356,17 @@ mod tests {
 
     #[test]
     fn test_update_score_popups_advances_elapsed() {
+        use bevy::time::TimeUpdateStrategy;
+        use std::time::Duration;
+
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        // Fix delta to 16 ms per frame so the test is deterministic regardless
+        // of wall-clock speed. The first update initializes Time with delta=0;
+        // subsequent updates each advance by exactly 16 ms.
+        app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+            16,
+        )));
         app.add_systems(Update, update_score_popups);
 
         let entity = app
@@ -378,10 +387,14 @@ mod tests {
             ))
             .id();
 
-        app.update();
-        app.update();
+        app.update(); // frame 0: Time initializes with delta = 0
+        app.update(); // frame 1: delta = 16 ms → elapsed should advance
 
         let popup = app.world().get::<ScorePopup>(entity).unwrap();
-        assert!(popup.elapsed > 0.0, "elapsed should advance after updates");
+        assert!(
+            popup.elapsed >= 0.016 - f32::EPSILON,
+            "elapsed should be at least 16 ms after second frame, got {}",
+            popup.elapsed
+        );
     }
 }
