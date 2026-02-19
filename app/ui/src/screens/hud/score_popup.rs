@@ -181,8 +181,9 @@ pub fn update_score_popups(
             continue;
         }
 
-        // Rise: move linearly upward
-        let progress = popup.elapsed / popup.duration;
+        // Rise: ease-out quad — fast start, decelerates as it fades
+        let t = popup.elapsed / popup.duration;
+        let progress = 1.0 - (1.0 - t) * (1.0 - t);
         transform.translation.y = popup.start_y + progress * popup.rise_distance;
 
         // Fade: linear from 1.0 to 0.0 after fade_start
