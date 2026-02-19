@@ -18,6 +18,7 @@ use bevy_kira_audio::AudioPlugin as KiraAudioPlugin;
 use suika_game_core::prelude::AppState;
 
 pub mod bgm;
+pub mod config;
 pub mod handles;
 
 // Future modules (uncomment as tasks are completed):
@@ -43,11 +44,23 @@ impl Plugin for GameAudioPlugin {
         // Add the kira audio backend.  All other audio plugins/systems rely on
         // this being registered first.
         app.add_plugins(KiraAudioPlugin)
+            // Audio config asset type + loader
+            .init_asset::<config::AudioConfig>()
+            .register_asset_loader(config::AudioConfigLoader)
+            // Resources
             .init_resource::<bgm::CurrentBgm>()
-            .add_systems(Startup, handles::load_audio_assets)
+            // Startup systems
+            .add_systems(
+                Startup,
+                (handles::load_audio_assets, config::load_audio_config),
+            )
+            // Update systems
             .add_systems(
                 Update,
-                bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
+                (
+                    bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
+                    config::hot_reload_audio_config,
+                ),
             );
 
         info!("GameAudioPlugin initialized (bevy_kira_audio ready)");

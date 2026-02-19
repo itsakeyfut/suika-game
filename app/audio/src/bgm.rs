@@ -23,6 +23,7 @@ use bevy_kira_audio::prelude::*;
 use std::time::Duration;
 use suika_game_core::prelude::AppState;
 
+use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::BgmHandles;
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,8 @@ pub fn switch_bgm_on_state_change(
     mut current_bgm: ResMut<CurrentBgm>,
     audio: Res<Audio>,
     bgm_handles: Option<Res<BgmHandles>>,
+    audio_config_handle: Option<Res<AudioConfigHandle>>,
+    audio_config_assets: Res<Assets<AudioConfig>>,
 ) {
     let Some(bgm_handles) = bgm_handles else {
         return;
@@ -112,10 +115,19 @@ pub fn switch_bgm_on_state_change(
         return;
     }
 
+    // Resolve audio config, falling back to defaults if not yet loaded.
+    let default_cfg = AudioConfig::default();
+    let cfg = audio_config_handle
+        .as_ref()
+        .and_then(|h| audio_config_assets.get(&h.0))
+        .unwrap_or(&default_cfg);
+
     // Fade out the currently-playing track.
     audio
         .stop()
-        .fade_out(AudioTween::linear(Duration::from_secs_f32(0.5)));
+        .fade_out(AudioTween::linear(Duration::from_secs_f32(
+            cfg.bgm_fade_out_secs,
+        )));
 
     // Start the new track.
     match desired {
@@ -126,19 +138,25 @@ pub fn switch_bgm_on_state_change(
             audio
                 .play(bgm_handles.title.clone())
                 .looped()
-                .with_volume(0.6)
-                .fade_in(AudioTween::linear(Duration::from_secs_f32(1.0)));
+                .with_volume(cfg.bgm_title_volume)
+                .fade_in(AudioTween::linear(Duration::from_secs_f32(
+                    cfg.bgm_title_fade_in_secs,
+                )));
         }
         BgmTrack::Game => {
             audio
                 .play(bgm_handles.game.clone())
                 .looped()
-                .with_volume(0.4)
-                .fade_in(AudioTween::linear(Duration::from_secs_f32(1.5)));
+                .with_volume(cfg.bgm_game_volume)
+                .fade_in(AudioTween::linear(Duration::from_secs_f32(
+                    cfg.bgm_game_fade_in_secs,
+                )));
         }
         BgmTrack::GameOver => {
             // One-shot: no loop, no fade-in.
-            audio.play(bgm_handles.gameover.clone()).with_volume(0.5);
+            audio
+                .play(bgm_handles.gameover.clone())
+                .with_volume(cfg.bgm_gameover_volume);
         }
     }
 
