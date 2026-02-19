@@ -4,10 +4,11 @@
 //!
 //! | File                          | Config type         | Controls                    |
 //! |-------------------------------|---------------------|-----------------------------|
-//! | `config/ui/hud/layout.ron`    | [`HudLayoutConfig`] | Widget anchor positions     |
-//! | `config/ui/hud/score.ron`     | [`ScoreHudConfig`]  | Score panel padding/gap     |
-//! | `config/ui/hud/best_score.ron`| [`BestScoreHudConfig`]| Best-score panel padding  |
-//! | `config/ui/hud/next.ron`      | [`NextHudConfig`]   | Next-fruit preview size     |
+//! | `config/ui/hud/layout.ron`     | [`HudLayoutConfig`]     | Widget anchor positions         |
+//! | `config/ui/hud/score.ron`      | [`ScoreHudConfig`]      | Score panel padding/gap         |
+//! | `config/ui/hud/best_score.ron` | [`BestScoreHudConfig`]  | Best-score panel padding        |
+//! | `config/ui/hud/next.ron`       | [`NextHudConfig`]       | Next-fruit preview size         |
+//! | `config/ui/hud/score_popup.ron`| [`ScorePopupConfig`]    | Floating score popup visuals    |
 //!
 //! All files are watched by Bevy's asset server, so edits take effect while
 //! the game is running (hot-reload).
@@ -59,6 +60,7 @@ macro_rules! ron_asset_loader {
 /// Controls where each widget group is placed on screen.  Adjust these values
 /// to reposition widgets without touching widget-level code.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct HudLayoutConfig {
     /// Margin from the screen edge for the score panels (pixels).
     pub edge_margin: f32,
@@ -99,6 +101,7 @@ const DEFAULT_SCORE_PULSE_PEAK_SCALE: f32 = 1.4;
 
 /// Score panel configuration loaded from `config/ui/hud/score.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct ScoreHudConfig {
     /// Inner padding of the panel node (pixels).
     pub panel_padding: f32,
@@ -137,6 +140,7 @@ const DEFAULT_BEST_SCORE_LABEL_VALUE_GAP: f32 = 4.0;
 
 /// Best-score panel configuration loaded from `config/ui/hud/best_score.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct BestScoreHudConfig {
     /// Inner padding of the panel node (pixels).
     pub panel_padding: f32,
@@ -165,6 +169,7 @@ ron_asset_loader!(BestScoreHudConfigLoader, BestScoreHudConfig);
 
 /// Next-fruit widget configuration loaded from `config/ui/hud/next.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct NextHudConfig {
     /// Diameter of the next-fruit preview circle (pixels).
     pub preview_size: f32,
@@ -196,6 +201,7 @@ const DEFAULT_POPUP_Z_LAYER: f32 = 8.0;
 
 /// Floating score popup configuration loaded from `config/ui/hud/score_popup.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct ScorePopupConfig {
     /// Total display duration before the popup despawns (seconds).
     pub duration: f32,
