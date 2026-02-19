@@ -192,6 +192,7 @@ const DEFAULT_POPUP_RISE_DISTANCE: f32 = 80.0;
 const DEFAULT_POPUP_FONT_SIZE_PER_RADIUS: f32 = 0.8;
 const DEFAULT_POPUP_FADE_START_FRACTION: f32 = 0.5;
 const DEFAULT_POPUP_RAINBOW_HUE_SPEED: f32 = 180.0;
+const DEFAULT_POPUP_Z_LAYER: f32 = 8.0;
 
 /// Floating score popup configuration loaded from `config/ui/hud/score_popup.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
@@ -206,6 +207,8 @@ pub struct ScorePopupConfig {
     pub fade_start_fraction: f32,
     /// Angular speed of the hue rotation in rainbow mode (degrees/second).
     pub rainbow_hue_speed: f32,
+    /// Z depth for the popup text entity — renders above game objects.
+    pub z_layer: f32,
 }
 
 impl Default for ScorePopupConfig {
@@ -216,6 +219,7 @@ impl Default for ScorePopupConfig {
             font_size_per_radius: DEFAULT_POPUP_FONT_SIZE_PER_RADIUS,
             fade_start_fraction: DEFAULT_POPUP_FADE_START_FRACTION,
             rainbow_hue_speed: DEFAULT_POPUP_RAINBOW_HUE_SPEED,
+            z_layer: DEFAULT_POPUP_Z_LAYER,
         }
     }
 }

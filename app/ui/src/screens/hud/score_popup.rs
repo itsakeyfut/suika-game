@@ -145,7 +145,7 @@ pub fn spawn_score_popups(
                 ..default()
             },
             TextColor(initial_color),
-            Transform::from_translation(event.position.extend(8.0)),
+            Transform::from_translation(event.position.extend(popup_cfg.z_layer)),
             ScorePopup {
                 elapsed: 0.0,
                 duration: popup_cfg.duration,
@@ -196,7 +196,7 @@ pub fn update_score_popups(
 
         // Color: rainbow for combo ≥ 4, otherwise tint initial_color with alpha
         text_color.0 = if popup.combo >= 4 {
-            let hue = (popup.elapsed * popup.rainbow_hue_speed) % 360.0;
+            let hue = (popup.elapsed * popup.rainbow_hue_speed).rem_euclid(360.0);
             Color::hsla(hue, 1.0, 0.65, alpha)
         } else {
             popup.initial_color.with_alpha(alpha)
