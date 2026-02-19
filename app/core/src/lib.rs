@@ -86,7 +86,7 @@ pub mod prelude {
         BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, FlashConfig,
         FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin,
         GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle, RonColor,
-        ShakeConfig, ShakeConfigHandle,
+        ShakeConfig, ShakeConfigHandle, WatermelonConfig, WatermelonConfigHandle,
     };
 
     // Events
@@ -107,6 +107,9 @@ pub mod prelude {
     pub use crate::systems::effects::droplet::{DropletColorMode, WaterDroplet};
     pub use crate::systems::effects::flash::{LocalFlashAnimation, ScreenFlashAnimation};
     pub use crate::systems::effects::shake::CameraShake;
+    pub use crate::systems::effects::watermelon::{
+        WatermelonBurstParticle, WatermelonExplosionRing,
+    };
 
     // Plugin
     pub use crate::GameCorePlugin;
@@ -209,6 +212,11 @@ impl Plugin for GameCorePlugin {
                 systems::effects::flash::animate_screen_flash,
                 // Camera shake — trauma accumulates on merge (Playing only)
                 systems::effects::shake::add_camera_shake.after(systems::merge::handle_fruit_merge),
+                // Watermelon special effects
+                systems::effects::watermelon::spawn_watermelon_effects
+                    .after(systems::merge::handle_fruit_merge),
+                systems::effects::watermelon::animate_watermelon_explosion,
+                systems::effects::watermelon::update_watermelon_burst_particles,
             )
                 .run_if(in_state(states::AppState::Playing)),
         );

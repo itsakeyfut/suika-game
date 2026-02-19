@@ -8,6 +8,7 @@ pub mod bounce;
 pub mod droplet;
 pub mod flash;
 pub mod shake;
+pub mod watermelon;
 
 use bevy::prelude::*;
 

@@ -9,6 +9,7 @@
 use crate::states::AppState;
 use bevy::asset::io::Reader;
 use bevy::asset::{Asset, AssetLoader, LoadContext};
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{
     Collider, ColliderMassProperties, DefaultRapierContext, Friction, RapierConfiguration,
@@ -258,6 +259,37 @@ pub struct ShakeConfig {
 #[derive(Resource)]
 pub struct ShakeConfigHandle(pub Handle<ShakeConfig>);
 
+/// Watermelon special-effect configuration
+///
+/// Loaded from `assets/config/effects/watermelon.ron`.
+/// Controls the expanding explosion ring and burst particles spawned when
+/// two Watermelons merge.
+#[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+pub struct WatermelonConfig {
+    /// Duration of the explosion ring animation in seconds
+    pub ring_duration: f32,
+    /// Initial diameter of the explosion ring in pixels
+    pub ring_initial_diameter: f32,
+    /// How many times larger the ring grows relative to its initial diameter
+    pub ring_expand_multiplier: f32,
+    /// Starting alpha of the explosion ring sprite
+    pub ring_initial_alpha: f32,
+    /// Number of burst particles spawned on Watermelon merge
+    pub burst_count: u32,
+    /// Minimum initial speed of burst particles in pixels/second
+    pub burst_min_speed: f32,
+    /// Maximum initial speed of burst particles in pixels/second
+    pub burst_max_speed: f32,
+    /// Visual diameter of each burst particle in pixels
+    pub burst_particle_size: f32,
+    /// Maximum lifetime of burst particles in seconds
+    pub burst_lifetime: f32,
+}
+
+/// Resource holding the handle to the loaded watermelon effect configuration
+#[derive(Resource)]
+pub struct WatermelonConfigHandle(pub Handle<WatermelonConfig>);
+
 /// Plugin for game configuration management
 pub struct GameConfigPlugin;
 
@@ -279,7 +311,9 @@ impl Plugin for GameConfigPlugin {
             .init_asset::<FlashConfig>()
             .register_asset_loader(FlashConfigLoader)
             .init_asset::<ShakeConfig>()
-            .register_asset_loader(ShakeConfigLoader);
+            .register_asset_loader(ShakeConfigLoader)
+            .init_asset::<WatermelonConfig>()
+            .register_asset_loader(WatermelonConfigLoader);
 
         // Load all configs and insert handles immediately
         let asset_server = app.world_mut().resource::<AssetServer>();
@@ -291,6 +325,8 @@ impl Plugin for GameConfigPlugin {
         let droplet_handle: Handle<DropletConfig> = asset_server.load("config/effects/droplet.ron");
         let flash_handle: Handle<FlashConfig> = asset_server.load("config/effects/flash.ron");
         let shake_handle: Handle<ShakeConfig> = asset_server.load("config/effects/shake.ron");
+        let watermelon_handle: Handle<WatermelonConfig> =
+            asset_server.load("config/effects/watermelon.ron");
 
         app.insert_resource(FruitsConfigHandle(fruits_handle))
             .insert_resource(PhysicsConfigHandle(physics_handle))
@@ -298,7 +334,8 @@ impl Plugin for GameConfigPlugin {
             .insert_resource(BounceConfigHandle(bounce_handle))
             .insert_resource(DropletConfigHandle(droplet_handle))
             .insert_resource(FlashConfigHandle(flash_handle))
-            .insert_resource(ShakeConfigHandle(shake_handle));
+            .insert_resource(ShakeConfigHandle(shake_handle))
+            .insert_resource(WatermelonConfigHandle(watermelon_handle));
 
         // Add hot-reload systems (run in all states so live-edit always works)
         app.add_systems(
@@ -311,6 +348,7 @@ impl Plugin for GameConfigPlugin {
                 hot_reload_droplet_config,
                 hot_reload_flash_config,
                 hot_reload_shake_config,
+                hot_reload_watermelon_config,
             ),
         );
 
@@ -319,46 +357,69 @@ impl Plugin for GameConfigPlugin {
 
         info!("✅ GameConfigPlugin initialized");
         info!(
-            "🔍 All configs load requested (fruits, physics, game_rules, bounce, droplet, flash, shake)"
+            "🔍 All configs load requested (fruits, physics, game_rules, bounce, droplet, flash, shake, watermelon)"
         );
     }
 }
 
+/// Bundles all config handle/asset pairs into a single `SystemParam` to stay
+/// within Bevy's 16-parameter system limit as more configs are added.
+#[derive(SystemParam)]
+struct AllConfigs<'w> {
+    physics_handle: Res<'w, PhysicsConfigHandle>,
+    physics_assets: Res<'w, Assets<PhysicsConfig>>,
+    fruits_handle: Res<'w, FruitsConfigHandle>,
+    fruits_assets: Res<'w, Assets<FruitsConfig>>,
+    game_rules_handle: Res<'w, GameRulesConfigHandle>,
+    game_rules_assets: Res<'w, Assets<GameRulesConfig>>,
+    bounce_handle: Res<'w, BounceConfigHandle>,
+    bounce_assets: Res<'w, Assets<BounceConfig>>,
+    droplet_handle: Res<'w, DropletConfigHandle>,
+    droplet_assets: Res<'w, Assets<DropletConfig>>,
+    flash_handle: Res<'w, FlashConfigHandle>,
+    flash_assets: Res<'w, Assets<FlashConfig>>,
+    shake_handle: Res<'w, ShakeConfigHandle>,
+    shake_assets: Res<'w, Assets<ShakeConfig>>,
+    watermelon_handle: Res<'w, WatermelonConfigHandle>,
+    watermelon_assets: Res<'w, Assets<WatermelonConfig>>,
+}
+
 /// Transitions from `Loading` → `Title` once all required RON configs are ready.
 ///
-/// Runs every frame during `AppState::Loading` and checks whether the three
-/// essential config assets (physics, fruits, game_rules) have finished loading.
-/// As soon as all three are available the state machine advances to `Title` so
-/// the rest of the game — including `setup_container` via `OnExit(Loading)` —
-/// can use fully-loaded values instead of fallbacks.
-#[allow(clippy::too_many_arguments)]
-fn wait_for_configs(
-    physics_handle: Res<PhysicsConfigHandle>,
-    physics_assets: Res<Assets<PhysicsConfig>>,
-    fruits_handle: Res<FruitsConfigHandle>,
-    fruits_assets: Res<Assets<FruitsConfig>>,
-    game_rules_handle: Res<GameRulesConfigHandle>,
-    game_rules_assets: Res<Assets<GameRulesConfig>>,
-    bounce_handle: Res<BounceConfigHandle>,
-    bounce_assets: Res<Assets<BounceConfig>>,
-    droplet_handle: Res<DropletConfigHandle>,
-    droplet_assets: Res<Assets<DropletConfig>>,
-    flash_handle: Res<FlashConfigHandle>,
-    flash_assets: Res<Assets<FlashConfig>>,
-    shake_handle: Res<ShakeConfigHandle>,
-    shake_assets: Res<Assets<ShakeConfig>>,
-    mut next_state: ResMut<NextState<AppState>>,
-) {
-    if physics_assets.get(&physics_handle.0).is_some()
-        && fruits_assets.get(&fruits_handle.0).is_some()
-        && game_rules_assets.get(&game_rules_handle.0).is_some()
-        && bounce_assets.get(&bounce_handle.0).is_some()
-        && droplet_assets.get(&droplet_handle.0).is_some()
-        && flash_assets.get(&flash_handle.0).is_some()
-        && shake_assets.get(&shake_handle.0).is_some()
+/// Runs every frame during `AppState::Loading` and checks whether all config
+/// assets have finished loading.  As soon as all are available the state machine
+/// advances to `Title` so the rest of the game — including `setup_container`
+/// via `OnExit(Loading)` — can use fully-loaded values instead of fallbacks.
+fn wait_for_configs(configs: AllConfigs, mut next_state: ResMut<NextState<AppState>>) {
+    if configs
+        .physics_assets
+        .get(&configs.physics_handle.0)
+        .is_some()
+        && configs
+            .fruits_assets
+            .get(&configs.fruits_handle.0)
+            .is_some()
+        && configs
+            .game_rules_assets
+            .get(&configs.game_rules_handle.0)
+            .is_some()
+        && configs
+            .bounce_assets
+            .get(&configs.bounce_handle.0)
+            .is_some()
+        && configs
+            .droplet_assets
+            .get(&configs.droplet_handle.0)
+            .is_some()
+        && configs.flash_assets.get(&configs.flash_handle.0).is_some()
+        && configs.shake_assets.get(&configs.shake_handle.0).is_some()
+        && configs
+            .watermelon_assets
+            .get(&configs.watermelon_handle.0)
+            .is_some()
     {
         info!(
-            "✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash, shake), transitioning to Title"
+            "✅ All configs loaded (physics, fruits, game_rules, bounce, droplet, flash, shake, watermelon), transitioning to Title"
         );
         next_state.set(AppState::Title);
     }
@@ -849,6 +910,7 @@ ron_asset_loader!(BounceConfigLoader, BounceConfig);
 ron_asset_loader!(DropletConfigLoader, DropletConfig);
 ron_asset_loader!(FlashConfigLoader, FlashConfig);
 ron_asset_loader!(ShakeConfigLoader, ShakeConfig);
+ron_asset_loader!(WatermelonConfigLoader, WatermelonConfig);
 
 // ---------------------------------------------------------------------------
 // Effect config hot-reload systems
@@ -929,6 +991,33 @@ fn hot_reload_flash_config(
             }
             AssetEvent::Removed { id: _ } => {
                 warn!("⚠️ Flash effect config removed");
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Handles hot-reloading of watermelon effect configuration
+fn hot_reload_watermelon_config(
+    mut events: MessageReader<AssetEvent<WatermelonConfig>>,
+    config_assets: Res<Assets<WatermelonConfig>>,
+    config_handle: Res<WatermelonConfigHandle>,
+) {
+    for event in events.read() {
+        match event {
+            AssetEvent::Added { id: _ } => {
+                info!("✅ Watermelon effect config loaded");
+            }
+            AssetEvent::Modified { id: _ } => {
+                if let Some(config) = config_assets.get(&config_handle.0) {
+                    info!(
+                        "🔥 Hot-reloading watermelon config! burst_count={}, ring_duration={}",
+                        config.burst_count, config.ring_duration
+                    );
+                }
+            }
+            AssetEvent::Removed { id: _ } => {
+                warn!("⚠️ Watermelon effect config removed");
             }
             _ => {}
         }
@@ -1190,6 +1279,32 @@ FlashConfig(
         assert_eq!(config.local_duration, 0.3);
         assert_eq!(config.local_initial_alpha, 0.6);
         assert_eq!(config.screen_flash_min_index, 8);
+    }
+
+    #[test]
+    fn test_watermelon_config_deserialization() {
+        let ron_data = r#"
+WatermelonConfig(
+    ring_duration: 0.7,
+    ring_initial_diameter: 160.0,
+    ring_expand_multiplier: 5.0,
+    ring_initial_alpha: 0.75,
+    burst_count: 48,
+    burst_min_speed: 150.0,
+    burst_max_speed: 500.0,
+    burst_particle_size: 5.0,
+    burst_lifetime: 0.9,
+)
+"#;
+        let config: WatermelonConfig = ron::de::from_str(ron_data).unwrap();
+        assert!((config.ring_duration - 0.7).abs() < f32::EPSILON);
+        assert_eq!(config.ring_initial_diameter, 160.0);
+        assert_eq!(config.ring_expand_multiplier, 5.0);
+        assert_eq!(config.burst_count, 48);
+        assert_eq!(config.burst_min_speed, 150.0);
+        assert_eq!(config.burst_max_speed, 500.0);
+        assert_eq!(config.burst_particle_size, 5.0);
+        assert!((config.burst_lifetime - 0.9).abs() < f32::EPSILON);
     }
 
     #[test]
