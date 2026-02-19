@@ -1,0 +1,21 @@
+// Floating score popup widget configuration
+// Controls the rise-and-fade animation shown at merge positions.
+//
+// Hot-reload enabled: Edit this file while the game is running to see changes instantly!
+//
+// Parameters:
+// - duration:             Total display duration before the popup despawns (seconds)
+// - rise_distance:        Total vertical distance traveled over duration (pixels)
+// - font_size_per_radius: Font size = resulting fruit radius × this multiplier
+// - fade_start_fraction:  Fraction of duration at which alpha fade-out begins (0.0–1.0)
+// - rainbow_hue_speed:    Hue rotation speed in rainbow mode for combo 4+ (degrees/second)
+// - z_layer:              Z depth for the popup text (higher = renders in front)
+
+ScorePopupConfig(
+    duration: 1.0,
+    rise_distance: 80.0,
+    font_size_per_radius: 0.8,
+    fade_start_fraction: 0.5,
+    rainbow_hue_speed: 180.0,
+    z_layer: 8.0,
+)

@@ -4,10 +4,11 @@
 //!
 //! | File                          | Config type         | Controls                    |
 //! |-------------------------------|---------------------|-----------------------------|
-//! | `config/ui/hud/layout.ron`    | [`HudLayoutConfig`] | Widget anchor positions     |
-//! | `config/ui/hud/score.ron`     | [`ScoreHudConfig`]  | Score panel padding/gap     |
-//! | `config/ui/hud/best_score.ron`| [`BestScoreHudConfig`]| Best-score panel padding  |
-//! | `config/ui/hud/next.ron`      | [`NextHudConfig`]   | Next-fruit preview size     |
+//! | `config/ui/hud/layout.ron`     | [`HudLayoutConfig`]     | Widget anchor positions         |
+//! | `config/ui/hud/score.ron`      | [`ScoreHudConfig`]      | Score panel padding/gap         |
+//! | `config/ui/hud/best_score.ron` | [`BestScoreHudConfig`]  | Best-score panel padding        |
+//! | `config/ui/hud/next.ron`       | [`NextHudConfig`]       | Next-fruit preview size         |
+//! | `config/ui/hud/score_popup.ron`| [`ScorePopupConfig`]    | Floating score popup visuals    |
 //!
 //! All files are watched by Bevy's asset server, so edits take effect while
 //! the game is running (hot-reload).
@@ -59,6 +60,7 @@ macro_rules! ron_asset_loader {
 /// Controls where each widget group is placed on screen.  Adjust these values
 /// to reposition widgets without touching widget-level code.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct HudLayoutConfig {
     /// Margin from the screen edge for the score panels (pixels).
     pub edge_margin: f32,
@@ -91,20 +93,33 @@ ron_asset_loader!(HudLayoutConfigLoader, HudLayoutConfig);
 // ScoreHudConfig — current-score panel appearance
 // ---------------------------------------------------------------------------
 
+// Default values — mirror `config/ui/hud/score.ron`
+const DEFAULT_SCORE_PANEL_PADDING: f32 = 10.0;
+const DEFAULT_SCORE_LABEL_VALUE_GAP: f32 = 4.0;
+const DEFAULT_SCORE_PULSE_DURATION: f32 = 0.35;
+const DEFAULT_SCORE_PULSE_PEAK_SCALE: f32 = 1.4;
+
 /// Score panel configuration loaded from `config/ui/hud/score.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct ScoreHudConfig {
     /// Inner padding of the panel node (pixels).
     pub panel_padding: f32,
     /// Vertical gap between the label and the value text (pixels).
     pub label_value_gap: f32,
+    /// Duration of the score-beats-highscore pulse animation (seconds).
+    pub pulse_duration: f32,
+    /// Peak scale factor at the midpoint of the pulse (1.0 = no change).
+    pub pulse_peak_scale: f32,
 }
 
 impl Default for ScoreHudConfig {
     fn default() -> Self {
         Self {
-            panel_padding: 10.0,
-            label_value_gap: 4.0,
+            panel_padding: DEFAULT_SCORE_PANEL_PADDING,
+            label_value_gap: DEFAULT_SCORE_LABEL_VALUE_GAP,
+            pulse_duration: DEFAULT_SCORE_PULSE_DURATION,
+            pulse_peak_scale: DEFAULT_SCORE_PULSE_PEAK_SCALE,
         }
     }
 }
@@ -119,8 +134,13 @@ ron_asset_loader!(ScoreHudConfigLoader, ScoreHudConfig);
 // BestScoreHudConfig — best-score panel appearance
 // ---------------------------------------------------------------------------
 
+// Default values — mirror `config/ui/hud/best_score.ron`
+const DEFAULT_BEST_SCORE_PANEL_PADDING: f32 = 10.0;
+const DEFAULT_BEST_SCORE_LABEL_VALUE_GAP: f32 = 4.0;
+
 /// Best-score panel configuration loaded from `config/ui/hud/best_score.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct BestScoreHudConfig {
     /// Inner padding of the panel node (pixels).
     pub panel_padding: f32,
@@ -131,8 +151,8 @@ pub struct BestScoreHudConfig {
 impl Default for BestScoreHudConfig {
     fn default() -> Self {
         Self {
-            panel_padding: 10.0,
-            label_value_gap: 4.0,
+            panel_padding: DEFAULT_BEST_SCORE_PANEL_PADDING,
+            label_value_gap: DEFAULT_BEST_SCORE_LABEL_VALUE_GAP,
         }
     }
 }
@@ -149,6 +169,7 @@ ron_asset_loader!(BestScoreHudConfigLoader, BestScoreHudConfig);
 
 /// Next-fruit widget configuration loaded from `config/ui/hud/next.ron`.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct NextHudConfig {
     /// Diameter of the next-fruit preview circle (pixels).
     pub preview_size: f32,
@@ -165,6 +186,55 @@ impl Default for NextHudConfig {
 pub struct NextHudConfigHandle(pub Handle<NextHudConfig>);
 
 ron_asset_loader!(NextHudConfigLoader, NextHudConfig);
+
+// ---------------------------------------------------------------------------
+// ScorePopupConfig — floating score popup appearance
+// ---------------------------------------------------------------------------
+
+// Default values — mirror `config/ui/hud/score_popup.ron`
+const DEFAULT_POPUP_DURATION: f32 = 1.0;
+const DEFAULT_POPUP_RISE_DISTANCE: f32 = 80.0;
+const DEFAULT_POPUP_FONT_SIZE_PER_RADIUS: f32 = 0.8;
+const DEFAULT_POPUP_FADE_START_FRACTION: f32 = 0.5;
+const DEFAULT_POPUP_RAINBOW_HUE_SPEED: f32 = 180.0;
+const DEFAULT_POPUP_Z_LAYER: f32 = 8.0;
+
+/// Floating score popup configuration loaded from `config/ui/hud/score_popup.ron`.
+#[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
+pub struct ScorePopupConfig {
+    /// Total display duration before the popup despawns (seconds).
+    pub duration: f32,
+    /// Total vertical distance traveled over `duration` (pixels).
+    pub rise_distance: f32,
+    /// Font size = resulting fruit radius × this multiplier.
+    pub font_size_per_radius: f32,
+    /// Fraction of `duration` at which the alpha fade-out begins (0.0–1.0).
+    pub fade_start_fraction: f32,
+    /// Angular speed of the hue rotation in rainbow mode (degrees/second).
+    pub rainbow_hue_speed: f32,
+    /// Z depth for the popup text entity — renders above game objects.
+    pub z_layer: f32,
+}
+
+impl Default for ScorePopupConfig {
+    fn default() -> Self {
+        Self {
+            duration: DEFAULT_POPUP_DURATION,
+            rise_distance: DEFAULT_POPUP_RISE_DISTANCE,
+            font_size_per_radius: DEFAULT_POPUP_FONT_SIZE_PER_RADIUS,
+            fade_start_fraction: DEFAULT_POPUP_FADE_START_FRACTION,
+            rainbow_hue_speed: DEFAULT_POPUP_RAINBOW_HUE_SPEED,
+            z_layer: DEFAULT_POPUP_Z_LAYER,
+        }
+    }
+}
+
+/// Resource holding the handle to the loaded [`ScorePopupConfig`].
+#[derive(Resource)]
+pub struct ScorePopupConfigHandle(pub Handle<ScorePopupConfig>);
+
+ron_asset_loader!(ScorePopupConfigLoader, ScorePopupConfig);
 
 // ---------------------------------------------------------------------------
 // Hot-reload systems
@@ -282,6 +352,20 @@ pub fn hot_reload_next_hud(
     }
 }
 
+/// No-op hot-reload handler for `config/ui/hud/score_popup.ron`.
+///
+/// The popup systems read the config handle directly each frame, so there is
+/// nothing to update reactively here.  This system exists solely to log a
+/// message when the file changes, making it easy to verify that hot-reload is
+/// working during development.
+pub fn hot_reload_score_popup(mut events: MessageReader<AssetEvent<ScorePopupConfig>>) {
+    for event in events.read() {
+        if let AssetEvent::Modified { .. } = event {
+            info!("🔥 Score popup config hot-reloaded");
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
@@ -303,7 +387,9 @@ impl Plugin for UiConfigPlugin {
             .init_asset::<BestScoreHudConfig>()
             .register_asset_loader(BestScoreHudConfigLoader)
             .init_asset::<NextHudConfig>()
-            .register_asset_loader(NextHudConfigLoader);
+            .register_asset_loader(NextHudConfigLoader)
+            .init_asset::<ScorePopupConfig>()
+            .register_asset_loader(ScorePopupConfigLoader);
 
         // Load all config files and store handles as resources
         let asset_server = app.world_mut().resource::<AssetServer>();
@@ -313,11 +399,14 @@ impl Plugin for UiConfigPlugin {
         let best_score_handle: Handle<BestScoreHudConfig> =
             asset_server.load("config/ui/hud/best_score.ron");
         let next_handle: Handle<NextHudConfig> = asset_server.load("config/ui/hud/next.ron");
+        let score_popup_handle: Handle<ScorePopupConfig> =
+            asset_server.load("config/ui/hud/score_popup.ron");
 
         app.insert_resource(HudLayoutConfigHandle(layout_handle))
             .insert_resource(ScoreHudConfigHandle(score_handle))
             .insert_resource(BestScoreHudConfigHandle(best_score_handle))
-            .insert_resource(NextHudConfigHandle(next_handle));
+            .insert_resource(NextHudConfigHandle(next_handle))
+            .insert_resource(ScorePopupConfigHandle(score_popup_handle));
 
         // Add hot-reload systems
         app.add_systems(
@@ -327,6 +416,7 @@ impl Plugin for UiConfigPlugin {
                 hot_reload_score_hud,
                 hot_reload_best_score_hud,
                 hot_reload_next_hud,
+                hot_reload_score_popup,
             ),
         );
 

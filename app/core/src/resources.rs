@@ -8,6 +8,17 @@ use bevy::prelude::*;
 
 use crate::fruit::FruitType;
 
+// ---------------------------------------------------------------------------
+// Default values for RON-loaded parameters
+// ---------------------------------------------------------------------------
+
+/// Default combo window in seconds — mirrors `game_rules.ron` `combo_window`.
+const DEFAULT_COMBO_WINDOW: f32 = 5.0;
+/// Default maximum combo count — mirrors `game_rules.ron` `combo_max`.
+const DEFAULT_COMBO_MAX: u32 = 10;
+/// Default game-over warning threshold in seconds — mirrors `game_rules.ron` `game_over_timer`.
+const DEFAULT_WARNING_THRESHOLD: f32 = 0.5;
+
 /// Main game state resource
 ///
 /// Tracks the player's current score, all-time high score,
@@ -42,7 +53,7 @@ impl Default for GameState {
 /// Manages the combo system by tracking time since the last merge
 /// and maintaining the current combo count.
 ///
-/// A combo occurs when fruits merge within the combo window (default 2.0 seconds).
+/// A combo occurs when fruits merge within the combo window (default 5.0 seconds).
 /// The combo counter increases with each merge in the window and resets
 /// when the window expires.
 #[derive(Resource, Debug, Clone)]
@@ -63,8 +74,8 @@ impl Default for ComboTimer {
             // Start with max value so first merge doesn't count as combo
             time_since_last_merge: f32::MAX,
             // Default values (updated from game_rules.ron at runtime)
-            combo_window: 2.0,
-            combo_max: 10,
+            combo_window: DEFAULT_COMBO_WINDOW,
+            combo_max: DEFAULT_COMBO_MAX,
             current_combo: 1,
         }
     }
@@ -102,6 +113,17 @@ impl ComboTimer {
     pub fn is_combo(&self) -> bool {
         self.current_combo >= 2
     }
+
+    /// Resets session state while preserving config values.
+    ///
+    /// Clears `time_since_last_merge` and `current_combo` back to their
+    /// initial values, but keeps `combo_window` and `combo_max` as loaded
+    /// from the RON config.  Use this instead of `*self = ComboTimer::default()`
+    /// when resetting between games.
+    pub fn reset_session(&mut self) {
+        self.time_since_last_merge = f32::MAX;
+        self.current_combo = 1;
+    }
 }
 
 /// Game over timer resource
@@ -126,7 +148,7 @@ impl Default for GameOverTimer {
             // Short threshold: long enough to ignore newly dropped fruits
             // passing through the boundary area, fast enough to feel immediate.
             // Can be overridden from game_rules.ron at runtime.
-            warning_threshold: 0.5,
+            warning_threshold: DEFAULT_WARNING_THRESHOLD,
             is_warning: false,
         }
     }
@@ -141,6 +163,15 @@ impl GameOverTimer {
 
     /// Resets the timer when all fruits are below the boundary
     pub fn reset(&mut self) {
+        self.time_over_boundary = 0.0;
+        self.is_warning = false;
+    }
+
+    /// Resets session state while preserving config values.
+    ///
+    /// Clears `time_over_boundary` and `is_warning`, but keeps
+    /// `warning_threshold` as loaded from the RON config.
+    pub fn reset_session(&mut self) {
         self.time_over_boundary = 0.0;
         self.is_warning = false;
     }
@@ -180,10 +211,11 @@ impl NextFruitType {
         self.0 = fruit_type;
     }
 
-    /// Generates a random spawnable fruit type
+    /// Generates a random spawnable fruit type from the full built-in list.
     ///
     /// Returns one of the 5 spawnable fruit types (Cherry through Persimmon)
-    /// with equal probability.
+    /// with equal probability.  Prefer [`randomize`] when the spawnable count
+    /// comes from `GameRulesConfig`.
     pub fn random() -> FruitType {
         use rand::RngExt;
         let spawnable = FruitType::spawnable_fruits();
@@ -191,9 +223,17 @@ impl NextFruitType {
         spawnable[index]
     }
 
-    /// Updates to a new random fruit type
-    pub fn randomize(&mut self) {
-        self.0 = Self::random();
+    /// Updates to a new random fruit type, respecting the configured count.
+    ///
+    /// `spawnable_count` is read from `GameRulesConfig::spawnable_fruit_count`
+    /// and determines how many of the leading entries in
+    /// `FruitType::spawnable_fruits()` are eligible.  Values outside the range
+    /// `1..=5` are clamped silently.
+    pub fn randomize(&mut self, spawnable_count: usize) {
+        use rand::RngExt;
+        let spawnable = FruitType::spawnable_fruits();
+        let n = spawnable_count.clamp(1, spawnable.len());
+        self.0 = spawnable[rand::rng().random_range(0..n)];
     }
 }
 
@@ -213,8 +253,8 @@ mod tests {
     fn test_combo_timer_default() {
         let timer = ComboTimer::default();
         assert_eq!(timer.time_since_last_merge, f32::MAX);
-        assert_eq!(timer.combo_window, 2.0); // Default value
-        assert_eq!(timer.combo_max, 10); // Default value
+        assert_eq!(timer.combo_window, DEFAULT_COMBO_WINDOW);
+        assert_eq!(timer.combo_max, DEFAULT_COMBO_MAX);
         assert_eq!(timer.current_combo, 1);
         assert!(!timer.is_combo());
     }
@@ -241,7 +281,7 @@ mod tests {
         assert_eq!(timer.current_combo, 3);
 
         // Merge after window expires - reset to 1
-        timer.time_since_last_merge = 3.0;
+        timer.time_since_last_merge = DEFAULT_COMBO_WINDOW + 1.0;
         timer.register_merge();
         assert_eq!(timer.current_combo, 1);
         assert!(!timer.is_combo());
@@ -256,7 +296,7 @@ mod tests {
         timer.check_and_reset();
         assert_eq!(timer.current_combo, 5); // Still in window
 
-        timer.time_since_last_merge = 3.0;
+        timer.time_since_last_merge = DEFAULT_COMBO_WINDOW + 1.0;
         timer.check_and_reset();
         assert_eq!(timer.current_combo, 1); // Window expired, reset
     }
@@ -278,7 +318,7 @@ mod tests {
     fn test_game_over_timer_default() {
         let timer = GameOverTimer::default();
         assert_eq!(timer.time_over_boundary, 0.0);
-        assert_eq!(timer.warning_threshold, 0.5); // Short threshold for near-immediate game-over
+        assert_eq!(timer.warning_threshold, DEFAULT_WARNING_THRESHOLD);
         assert!(!timer.is_warning);
         assert!(!timer.is_game_over());
     }
@@ -343,10 +383,35 @@ mod tests {
     #[test]
     fn test_next_fruit_type_randomize() {
         let mut next = NextFruitType::default();
-        next.randomize();
+        next.randomize(5);
 
         // Check that it's a spawnable fruit
         let spawnable = FruitType::spawnable_fruits();
         assert!(spawnable.contains(&next.get()));
+    }
+
+    #[test]
+    fn test_next_fruit_type_randomize_count_limits_range() {
+        // With count=1, only Cherry should ever be returned
+        let mut next = NextFruitType::default();
+        for _ in 0..20 {
+            next.randomize(1);
+            assert_eq!(
+                next.get(),
+                FruitType::Cherry,
+                "With spawnable_count=1 only Cherry should be returned"
+            );
+        }
+    }
+
+    #[test]
+    fn test_next_fruit_type_randomize_clamps_oversized_count() {
+        // count > 5 should clamp to 5 without panicking
+        let mut next = NextFruitType::default();
+        let spawnable = FruitType::spawnable_fruits();
+        for _ in 0..20 {
+            next.randomize(999);
+            assert!(spawnable.contains(&next.get()));
+        }
     }
 }

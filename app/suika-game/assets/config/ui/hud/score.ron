@@ -3,10 +3,14 @@
 // Hot-reload enabled: Edit this file while the game is running to see changes instantly!
 //
 // Parameters:
-// - panel_padding:   Inner padding of the panel node (pixels)
-// - label_value_gap: Vertical gap between the label and the value text (pixels)
+// - panel_padding:    Inner padding of the panel node (pixels)
+// - label_value_gap:  Vertical gap between the label and the value text (pixels)
+// - pulse_duration:   Duration of the score-beats-highscore pulse animation (seconds)
+// - pulse_peak_scale: Peak scale factor at the midpoint of the pulse (1.0 = no change)
 
 ScoreHudConfig(
     panel_padding: 10.0,
     label_value_gap: 4.0,
+    pulse_duration: 0.35,
+    pulse_peak_scale: 1.4,
 )

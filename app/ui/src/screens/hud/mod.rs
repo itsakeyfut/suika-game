@@ -33,6 +33,7 @@
 pub mod best_score;
 pub mod next;
 pub mod score;
+pub mod score_popup;
 
 use bevy::prelude::*;
 use suika_game_core::prelude::AppState;
