@@ -84,10 +84,13 @@ pub struct SfxHandles {
 /// Startup system — loads all audio assets and inserts [`BgmHandles`] and
 /// [`SfxHandles`] as resources.
 ///
-/// The `AssetServer` returns weak handles immediately; the actual audio data
-/// is loaded asynchronously in the background.  Audio systems that use these
-/// handles will silently skip playback if the asset has not yet finished
-/// loading (this is the default bevy_kira_audio behaviour).
+/// The `AssetServer` returns strong handles immediately; the actual audio data
+/// is loaded asynchronously in the background.  The resources keep the assets
+/// alive for the lifetime of the application (weak handles require explicitly
+/// calling `.clone_weak()` and may allow assets to be unloaded prematurely).
+/// Audio systems that use these handles will silently skip playback if the
+/// asset has not yet finished loading (this is the default bevy_kira_audio
+/// behaviour).
 pub fn load_audio_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(BgmHandles {
         title: asset_server.load("sounds/bgm/title_bgm.ogg"),
