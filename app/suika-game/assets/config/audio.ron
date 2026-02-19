@@ -16,8 +16,8 @@ AudioConfig(
 
     // --- BGM fade durations (seconds) ---
     bgm_fade_out_secs:       0.5,
-    bgm_title_fade_in_secs:  1.0,
-    bgm_game_fade_in_secs:   1.5,
+    bgm_title_fade_in_secs:  0.3,
+    bgm_game_fade_in_secs:   0.3,
 
     // --- SFX volumes ---
     sfx_drop_volume:          0.0,
