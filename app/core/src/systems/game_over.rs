@@ -109,8 +109,8 @@ pub fn reset_game_state(
         elapsed_time: 0.0,
         is_new_record: false,
     };
-    *combo_timer = ComboTimer::default();
-    *game_over_timer = GameOverTimer::default();
+    combo_timer.reset_session();
+    game_over_timer.reset_session();
 
     let mut despawned = 0u32;
     for entity in fruit_query.iter() {

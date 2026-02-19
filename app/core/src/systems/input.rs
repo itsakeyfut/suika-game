@@ -14,9 +14,25 @@ use bevy_rapier2d::prelude::*;
 use bevy_rapier2d::rapier::geometry::CollisionEventFlags;
 
 use crate::components::{BottomWall, Fruit, FruitSpawnState};
-use crate::config::{FruitsConfig, FruitsConfigHandle, PhysicsConfig, PhysicsConfigHandle};
+use crate::config::{
+    FruitsConfig, FruitsConfigHandle, GameRulesConfig, GameRulesConfigHandle, PhysicsConfig,
+    PhysicsConfigHandle,
+};
 use crate::fruit::FruitType;
 use crate::resources::NextFruitType;
+
+// ---------------------------------------------------------------------------
+// Default values for RON-loaded parameters (fallbacks before configs are loaded)
+// ---------------------------------------------------------------------------
+
+/// Default spawnable fruit count — mirrors `game_rules.ron` `spawnable_fruit_count`.
+const DEFAULT_SPAWNABLE_FRUIT_COUNT: usize = 5;
+/// Default keyboard move speed (px/s) — mirrors `physics.ron` `keyboard_move_speed`.
+const DEFAULT_KEYBOARD_MOVE_SPEED: f32 = 300.0;
+/// Default container width (px) — mirrors `physics.ron` `container_width`.
+const DEFAULT_CONTAINER_WIDTH: f32 = 600.0;
+/// Default fruit radius (px) — mirrors the Cherry entry radius in `fruits.ron`.
+const DEFAULT_FRUIT_RADIUS: f32 = 20.0;
 
 /// Resource tracking the current spawn position for the next fruit
 ///
@@ -84,6 +100,8 @@ pub fn spawn_held_fruit(
     fruits_config_assets: Res<Assets<FruitsConfig>>,
     physics_config_handle: Res<PhysicsConfigHandle>,
     physics_config_assets: Res<Assets<PhysicsConfig>>,
+    rules_config_handle: Option<Res<GameRulesConfigHandle>>,
+    rules_config_assets: Option<Res<Assets<GameRulesConfig>>>,
 ) {
     // Get the configs, return early if not loaded yet
     let Some(fruits_config) = fruits_config_assets.get(&fruits_config_handle.0) else {
@@ -94,6 +112,14 @@ pub fn spawn_held_fruit(
         warn!("Physics config not loaded yet, cannot spawn fruit");
         return;
     };
+
+    // Spawnable count from game rules (default to 5 if config not yet loaded)
+    let spawnable_count = rules_config_handle
+        .as_ref()
+        .zip(rules_config_assets.as_ref())
+        .and_then(|(h, a)| a.get(&h.0))
+        .map(|r| r.spawnable_fruit_count)
+        .unwrap_or(DEFAULT_SPAWNABLE_FRUIT_COUNT);
 
     // Count fruits by state in a single iteration
     let (held_count, falling_count, landed_count) =
@@ -145,7 +171,7 @@ pub fn spawn_held_fruit(
 
         // Randomize next fruit type for preview display
         // This ensures the preview shows the NEXT fruit, not the current held fruit
-        next_fruit.randomize();
+        next_fruit.randomize(spawnable_count);
     }
 }
 
@@ -329,7 +355,7 @@ pub fn update_spawn_position(
     if *input_mode == InputMode::Keyboard {
         let move_speed = physics_config
             .map(|c| c.keyboard_move_speed)
-            .unwrap_or(300.0); // Fallback to 300.0 if config not loaded
+            .unwrap_or(DEFAULT_KEYBOARD_MOVE_SPEED);
 
         if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
             spawn_pos.x -= move_speed * time.delta_secs();
@@ -374,14 +400,16 @@ pub fn update_spawn_position(
             .iter()
             .find(|(_, state, _)| **state == FruitSpawnState::Held)
             .map(|(_, _, fruit_type)| fruit_type.parameters_from_config(config).radius)
-            .unwrap_or(20.0) // Default to smallest fruit if none found
+            .unwrap_or(DEFAULT_FRUIT_RADIUS)
     } else {
-        20.0 // Config not loaded yet, use default
+        DEFAULT_FRUIT_RADIUS
     };
 
     // Clamp spawn position within container bounds
     // Use the actual fruit radius to allow the fruit to touch the wall
-    let container_width = physics_config.map(|c| c.container_width).unwrap_or(600.0); // Fallback
+    let container_width = physics_config
+        .map(|c| c.container_width)
+        .unwrap_or(DEFAULT_CONTAINER_WIDTH);
     let max_x = container_width / 2.0 - held_fruit_radius;
     spawn_pos.x = spawn_pos.x.clamp(-max_x, max_x);
 
@@ -544,7 +572,7 @@ mod tests {
     #[test]
     fn test_spawn_position_clamp() {
         // Use default fruit radius (20.0) to match system behavior
-        let max_x = 600.0 / 2.0 - 20.0; // Default container width
+        let max_x = DEFAULT_CONTAINER_WIDTH / 2.0 - DEFAULT_FRUIT_RADIUS;
 
         // Test clamping
         let mut pos = SpawnPosition { x: 1000.0 };
@@ -756,7 +784,7 @@ mod tests {
 
         let pos = app.world().resource::<SpawnPosition>();
         // Use default fruit radius (20.0) to match system behavior
-        let max_x = 600.0 / 2.0 - 20.0; // Default container width
+        let max_x = DEFAULT_CONTAINER_WIDTH / 2.0 - DEFAULT_FRUIT_RADIUS;
 
         assert!(
             pos.x <= max_x,

@@ -17,7 +17,7 @@ GameRulesConfig(
     spawnable_fruit_count: 5,
 
     // Combo system
-    combo_window: 2.0,
+    combo_window: 5.0,
     combo_max: 10,
 
     // Game over rules

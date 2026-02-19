@@ -11,6 +11,10 @@
 //!
 //! # Combo multipliers
 //!
+//! Multipliers are loaded from `game_rules.ron` via `combo_bonuses`.
+//! The built-in fallback (used when the config is unavailable) matches the
+//! default RON values:
+//!
 //! | Combo count | Multiplier |
 //! |-------------|-----------|
 //! | 1 (no combo)| 1.0×      |
@@ -21,31 +25,64 @@
 
 use bevy::prelude::*;
 
-use crate::config::{FruitsConfig, FruitsConfigHandle};
+use crate::config::{FruitsConfig, FruitsConfigHandle, GameRulesConfig, GameRulesConfigHandle};
 use crate::events::FruitMergeEvent;
 use crate::resources::{ComboTimer, GameState};
 
-/// Returns the combo score multiplier for a given combo count
+// ---------------------------------------------------------------------------
+// Default combo bonus fallbacks — mirror `game_rules.ron` `combo_bonuses`
+// ---------------------------------------------------------------------------
+
+/// Fallback multiplier for a 2× combo — mirrors `game_rules.ron` `combo_bonuses` key 2.
+const DEFAULT_COMBO_BONUS_2: f32 = 1.1;
+/// Fallback multiplier for a 3× combo — mirrors `game_rules.ron` `combo_bonuses` key 3.
+const DEFAULT_COMBO_BONUS_3: f32 = 1.2;
+/// Fallback multiplier for a 4× combo — mirrors `game_rules.ron` `combo_bonuses` key 4.
+const DEFAULT_COMBO_BONUS_4: f32 = 1.3;
+/// Fallback multiplier for a 5×+ combo — mirrors `game_rules.ron` `combo_bonuses` key 5.
+const DEFAULT_COMBO_BONUS_5_PLUS: f32 = 1.5;
+
+/// Returns the combo score multiplier for the given combo count.
+///
+/// When `rules` is `Some`, the multiplier is looked up from
+/// `GameRulesConfig::combo_bonuses`.  The map is treated as a step function:
+/// the entry with the largest key ≤ `combo` is used, so a map with keys
+/// `{2, 3, 4, 5}` naturally covers all combos ≥ 5 through the `5` entry.
+///
+/// When `rules` is `None` the function falls back to the hardcoded defaults
+/// that match the shipped `game_rules.ron`.
 ///
 /// # Examples
 ///
 /// ```
 /// # use suika_game_core::systems::score::combo_multiplier;
-/// assert_eq!(combo_multiplier(0), 1.0); // invalid input → treated as no combo
-/// assert_eq!(combo_multiplier(1), 1.0);
-/// assert_eq!(combo_multiplier(2), 1.1);
-/// assert_eq!(combo_multiplier(3), 1.2);
-/// assert_eq!(combo_multiplier(4), 1.3);
-/// assert_eq!(combo_multiplier(5), 1.5);
-/// assert_eq!(combo_multiplier(10), 1.5);
+/// assert_eq!(combo_multiplier(0, None), 1.0);
+/// assert_eq!(combo_multiplier(1, None), 1.0);
+/// assert_eq!(combo_multiplier(2, None), 1.1);
+/// assert_eq!(combo_multiplier(3, None), 1.2);
+/// assert_eq!(combo_multiplier(4, None), 1.3);
+/// assert_eq!(combo_multiplier(5, None), 1.5);
+/// assert_eq!(combo_multiplier(10, None), 1.5);
 /// ```
-pub fn combo_multiplier(combo: u32) -> f32 {
-    match combo {
-        0 | 1 => 1.0,
-        2 => 1.1,
-        3 => 1.2,
-        4 => 1.3,
-        _ => 1.5, // 5+
+pub fn combo_multiplier(combo: u32, rules: Option<&GameRulesConfig>) -> f32 {
+    if let Some(rules) = rules {
+        // Step-function lookup: find the largest key ≤ combo.
+        rules
+            .combo_bonuses
+            .iter()
+            .filter(|&(&k, _)| k <= combo)
+            .max_by_key(|&(&k, _)| k)
+            .map(|(_, &v)| v)
+            .unwrap_or(1.0)
+    } else {
+        // Hardcoded fallback — mirrors the default game_rules.ron values.
+        match combo {
+            0 | 1 => 1.0,
+            2 => DEFAULT_COMBO_BONUS_2,
+            3 => DEFAULT_COMBO_BONUS_3,
+            4 => DEFAULT_COMBO_BONUS_4,
+            _ => DEFAULT_COMBO_BONUS_5_PLUS,
+        }
     }
 }
 
@@ -54,7 +91,7 @@ pub fn combo_multiplier(combo: u32) -> f32 {
 /// For each merge event:
 /// 1. Registers the merge with `ComboTimer` (updates combo count and window)
 /// 2. Calculates base points from the merged fruit's config entry
-/// 3. Applies the combo multiplier (`combo_multiplier`)
+/// 3. Applies the combo multiplier from `GameRulesConfig::combo_bonuses`
 /// 4. Adds the result to `GameState.score`
 ///
 /// If the fruits config is not yet loaded, events are drained silently.
@@ -64,16 +101,23 @@ pub fn update_score_on_merge(
     mut combo_timer: ResMut<ComboTimer>,
     fruits_handle: Res<FruitsConfigHandle>,
     fruits_assets: Res<Assets<FruitsConfig>>,
+    rules_handle: Option<Res<GameRulesConfigHandle>>,
+    rules_assets: Option<Res<Assets<GameRulesConfig>>>,
 ) {
     let Some(config) = fruits_assets.get(&fruits_handle.0) else {
         for _ in merge_events.read() {}
         return;
     };
 
+    let rules = rules_handle
+        .as_ref()
+        .zip(rules_assets.as_ref())
+        .and_then(|(h, a)| a.get(&h.0));
+
     for event in merge_events.read() {
         // Update the combo timer first so the multiplier reflects this merge
         combo_timer.register_merge();
-        let multiplier = combo_multiplier(combo_timer.current_combo);
+        let multiplier = combo_multiplier(combo_timer.current_combo, rules);
 
         // Base points from the merged fruit type (not the resulting fruit)
         let base_points = event
@@ -114,6 +158,7 @@ mod tests {
     use crate::events::FruitMergeEvent;
     use crate::fruit::FruitType;
     use crate::resources::{ComboTimer, GameState};
+    use std::collections::HashMap;
 
     fn create_test_config() -> FruitsConfig {
         FruitsConfig {
@@ -144,22 +189,46 @@ mod tests {
         app.insert_resource(FruitsConfigHandle(handle));
 
         app
+        // Note: GameRulesConfig is intentionally omitted here.
+        // update_score_on_merge falls back to hardcoded multipliers when absent.
     }
 
-    // --- combo_multiplier unit tests ---
+    // --- combo_multiplier unit tests (fallback / None path) ---
 
     #[test]
     fn test_combo_multiplier_no_combo() {
-        assert_eq!(combo_multiplier(1), 1.0);
+        assert_eq!(combo_multiplier(1, None), 1.0);
     }
 
     #[test]
     fn test_combo_multiplier_levels() {
-        assert!((combo_multiplier(2) - 1.1).abs() < f32::EPSILON);
-        assert!((combo_multiplier(3) - 1.2).abs() < f32::EPSILON);
-        assert!((combo_multiplier(4) - 1.3).abs() < f32::EPSILON);
-        assert!((combo_multiplier(5) - 1.5).abs() < f32::EPSILON);
-        assert!((combo_multiplier(10) - 1.5).abs() < f32::EPSILON);
+        assert!((combo_multiplier(2, None) - DEFAULT_COMBO_BONUS_2).abs() < f32::EPSILON);
+        assert!((combo_multiplier(3, None) - DEFAULT_COMBO_BONUS_3).abs() < f32::EPSILON);
+        assert!((combo_multiplier(4, None) - DEFAULT_COMBO_BONUS_4).abs() < f32::EPSILON);
+        assert!((combo_multiplier(5, None) - DEFAULT_COMBO_BONUS_5_PLUS).abs() < f32::EPSILON);
+        assert!((combo_multiplier(10, None) - DEFAULT_COMBO_BONUS_5_PLUS).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_combo_multiplier_from_config() {
+        let rules = GameRulesConfig {
+            spawnable_fruit_count: 5,
+            combo_window: 2.0,
+            combo_max: 10,
+            game_over_timer: 3.0,
+            combo_bonuses: HashMap::from([(2, 2.0), (3, 3.0), (5, 5.0)]),
+            preview_x_offset: 0.0,
+            preview_y_offset: 0.0,
+            preview_scale: 1.0,
+        };
+        // combo=1 → no key ≤ 1 in map → 1.0
+        assert!((combo_multiplier(1, Some(&rules)) - 1.0).abs() < f32::EPSILON);
+        // combo=2 → key 2 → 2.0
+        assert!((combo_multiplier(2, Some(&rules)) - 2.0).abs() < f32::EPSILON);
+        // combo=4 → largest key ≤ 4 is 3 → 3.0
+        assert!((combo_multiplier(4, Some(&rules)) - 3.0).abs() < f32::EPSILON);
+        // combo=10 → largest key ≤ 10 is 5 → 5.0
+        assert!((combo_multiplier(10, Some(&rules)) - 5.0).abs() < f32::EPSILON);
     }
 
     // --- update_score_on_merge system tests ---

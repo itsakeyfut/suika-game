@@ -35,7 +35,11 @@ impl Plugin for GameUIPlugin {
                 (
                     screens::hud::best_score::update_best_score,
                     screens::hud::score::update_score,
+                    screens::hud::score::animate_score_pulse
+                        .after(screens::hud::score::update_score),
                     screens::hud::next::update_next,
+                    screens::hud::score_popup::spawn_score_popups,
+                    screens::hud::score_popup::update_score_popups,
                 )
                     .run_if(in_state(AppState::Playing)),
             )
