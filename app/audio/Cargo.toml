@@ -8,3 +8,5 @@ bevy.workspace = true
 bevy_kira_audio.workspace = true
 suika-game-core.workspace = true
 suika-game-assets.workspace = true
+ron.workspace = true
+serde.workspace = true

@@ -1,0 +1,32 @@
+// Audio configuration for Suika Game.
+//
+// All volumes are in dB relative to full-scale (bevy_kira_audio convention):
+//   0.0 dB  = full volume
+//  -6.0 dB  ≈ half perceived loudness
+// -20.0 dB  = very quiet
+//
+// Fade times are in seconds.
+// Hot-reload is supported: edit this file while the game is running and
+// changes will be applied on the next BGM track switch or SFX playback.
+AudioConfig(
+    // --- BGM volumes ---
+    bgm_title_volume:    -4.0,
+    bgm_game_volume:     -8.0,
+    bgm_gameover_volume: -6.0,
+
+    // --- BGM fade durations (seconds) ---
+    bgm_fade_out_secs:       0.5,
+    bgm_title_fade_in_secs:  1.0,
+    bgm_game_fade_in_secs:   1.5,
+
+    // --- SFX volumes ---
+    sfx_drop_volume:          0.0,
+    sfx_merge_small_volume:   0.0,
+    sfx_merge_medium_volume:  0.0,
+    sfx_merge_large_volume:   0.0,
+    sfx_watermelon_volume:    0.0,
+    sfx_combo_volume:         0.0,
+    sfx_gameover_volume:      0.0,
+    sfx_button_click_volume:  0.0,
+    sfx_button_hover_volume:  0.0,
+)

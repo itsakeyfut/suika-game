@@ -15,11 +15,13 @@
 
 use bevy::prelude::*;
 use bevy_kira_audio::AudioPlugin as KiraAudioPlugin;
+use suika_game_core::prelude::AppState;
 
+pub mod bgm;
+pub mod config;
 pub mod handles;
 
 // Future modules (uncomment as tasks are completed):
-// pub mod bgm;
 // pub mod sfx;
 
 /// Integrates [`bevy_kira_audio`] into the game and registers all audio systems.
@@ -42,14 +44,29 @@ impl Plugin for GameAudioPlugin {
         // Add the kira audio backend.  All other audio plugins/systems rely on
         // this being registered first.
         app.add_plugins(KiraAudioPlugin)
-            .add_systems(Startup, handles::load_audio_assets);
+            // Audio config asset type + loader
+            .init_asset::<config::AudioConfig>()
+            .register_asset_loader(config::AudioConfigLoader)
+            // Resources
+            .init_resource::<bgm::CurrentBgm>()
+            // Startup systems
+            .add_systems(
+                Startup,
+                (handles::load_audio_assets, config::load_audio_config),
+            )
+            // Update systems
+            .add_systems(
+                Update,
+                (
+                    bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
+                    config::hot_reload_audio_config,
+                ),
+            );
 
         info!("GameAudioPlugin initialized (bevy_kira_audio ready)");
 
         // TODO: register systems when subsequent audio tasks are implemented:
         // app
-        //     .init_resource::<CurrentBgm>()
-        //     .add_systems(Update, bgm::switch_bgm_on_state_change)
         //     .add_systems(Update, (sfx::play_merge_sfx, sfx::play_combo_sfx, sfx::play_ui_sfx))
         //     .add_systems(OnEnter(AppState::GameOver), sfx::play_gameover_sfx);
     }
