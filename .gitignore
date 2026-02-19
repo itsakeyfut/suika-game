@@ -5,3 +5,7 @@ Cargo.lock
 
 save/
 TODO.md
+
+## Ignore audio files because I will create them in the future and I don't want to accidentally commit them
+**.ogg
+**.wav
