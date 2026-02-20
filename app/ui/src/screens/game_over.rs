@@ -5,6 +5,7 @@
 //! - The **final score** in large text
 //! - A **NEW RECORD!** banner when a new highscore was achieved
 //! - The **all-time highscore**
+//! - The **elapsed time** for this run in `M:SS` format
 //! - A **Retry** button (→ [`AppState::Playing`])
 //! - A **Title** button (→ [`AppState::Title`])
 //!
@@ -16,6 +17,7 @@ use bevy::prelude::*;
 use suika_game_core::prelude::{AppState, GameState};
 
 use crate::components::{ButtonAction, KeyboardFocusIndex, spawn_button};
+use crate::screens::hud::format_elapsed;
 use crate::styles::{
     BG_COLOR, BUTTON_LARGE_HEIGHT, BUTTON_LARGE_WIDTH, BUTTON_MEDIUM_HEIGHT, BUTTON_MEDIUM_WIDTH,
     FONT_JP, FONT_SIZE_HUGE, FONT_SIZE_LARGE, FONT_SIZE_MEDIUM, FONT_SIZE_SMALL, HIGHLIGHT_COLOR,
@@ -120,6 +122,24 @@ pub fn setup_game_over_screen(
                 Text::new(format!(
                     "ハイスコア: {}",
                     format_score(game_state.highscore)
+                )),
+                TextFont {
+                    font: font.clone(),
+                    font_size: FONT_SIZE_SMALL,
+                    ..default()
+                },
+                TextColor(TEXT_COLOR),
+                Node {
+                    margin: UiRect::bottom(Val::Px(10.0)),
+                    ..default()
+                },
+            ));
+
+            // Elapsed time for this run
+            parent.spawn((
+                Text::new(format!(
+                    "プレイ時間: {}",
+                    format_elapsed(game_state.elapsed_time as u32)
                 )),
                 TextFont {
                     font: font.clone(),
