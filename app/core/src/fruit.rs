@@ -114,6 +114,14 @@ impl FruitType {
         })
     }
 
+    /// Returns the zero-based stage index of this fruit type.
+    ///
+    /// Cherry = 0, Strawberry = 1, …, Watermelon = 10.
+    /// Used to scale size-dependent effects (e.g. particle count).
+    pub fn stage_index(&self) -> usize {
+        *self as usize
+    }
+
     /// Returns the array of fruits that can be spawned by the player
     ///
     /// Only the first 5 fruits (Cherry through Persimmon) can be spawned.
@@ -179,6 +187,36 @@ mod tests {
         assert_eq!(spawnable[2], FruitType::Grape);
         assert_eq!(spawnable[3], FruitType::Dekopon);
         assert_eq!(spawnable[4], FruitType::Persimmon);
+    }
+
+    #[test]
+    fn test_stage_index_order() {
+        assert_eq!(FruitType::Cherry.stage_index(), 0);
+        assert_eq!(FruitType::Strawberry.stage_index(), 1);
+        assert_eq!(FruitType::Watermelon.stage_index(), 10);
+    }
+
+    #[test]
+    fn test_stage_index_monotone() {
+        let fruits = [
+            FruitType::Cherry,
+            FruitType::Strawberry,
+            FruitType::Grape,
+            FruitType::Dekopon,
+            FruitType::Persimmon,
+            FruitType::Apple,
+            FruitType::Pear,
+            FruitType::Peach,
+            FruitType::Pineapple,
+            FruitType::Melon,
+            FruitType::Watermelon,
+        ];
+        for window in fruits.windows(2) {
+            assert!(
+                window[0].stage_index() < window[1].stage_index(),
+                "stage_index must be strictly increasing along the evolution chain"
+            );
+        }
     }
 
     #[test]

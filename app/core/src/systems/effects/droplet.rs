@@ -51,7 +51,27 @@ pub struct WaterDroplet {
     pub max_lifetime: f32,
 }
 
-// --- Internal helper ---
+// --- Internal helpers ---
+
+/// Scales a base droplet count by the fruit's stage index.
+///
+/// Larger fruits (higher stage) emit proportionally more particles.
+/// The multiplier grows linearly from **1×** at stage 0 (Cherry) to
+/// **3×** at stage 10 (Watermelon), producing a noticeable visual
+/// difference between a small cherry burst and a watermelon explosion.
+///
+/// | Stage | Fruit       | Multiplier | Merge count (base 12) |
+/// |-------|-------------|------------|-----------------------|
+/// | 0     | Cherry      | 1.0×       | 12                    |
+/// | 5     | Apple       | 2.0×       | 24                    |
+/// | 10    | Watermelon  | 3.0×       | 36                    |
+fn scale_count_by_fruit(base: u32, fruit_type: crate::fruit::FruitType) -> u32 {
+    const MAX_SCALE: f32 = 3.0;
+    const STAGE_COUNT: f32 = 10.0; // Watermelon is stage 10
+    let stage = fruit_type.stage_index() as f32;
+    let scale = 1.0 + (stage / STAGE_COUNT) * (MAX_SCALE - 1.0);
+    ((base as f32 * scale).round() as u32).max(1)
+}
 
 /// Resolves the droplet spawn color from config mode and fruit color.
 ///
@@ -135,19 +155,22 @@ fn spawn_droplets(
 
 // --- Systems ---
 
-/// Spawns water droplets on fruit merge events
+/// Spawns water droplets on fruit merge events.
 ///
-/// Reads `FruitMergeEvent` and spawns `DROPLET_COUNT_MERGE` droplets radiating
-/// outward from the merge position, using the merged fruit's placeholder color.
+/// The number of droplets scales with the resulting fruit's stage so that
+/// larger merges produce a more dramatic particle burst.  The base count
+/// comes from [`DropletConfig::count_merge`] (or [`DROPLET_COUNT_MERGE`] as
+/// fallback) and is multiplied by [`scale_count_by_fruit`].
 pub fn spawn_merge_droplets(
     mut commands: Commands,
     mut merge_events: MessageReader<FruitMergeEvent>,
     droplet: DropletParams<'_>,
 ) {
     let config = droplet.get();
-    let count = config.map(|c| c.count_merge).unwrap_or(DROPLET_COUNT_MERGE);
+    let base_count = config.map(|c| c.count_merge).unwrap_or(DROPLET_COUNT_MERGE);
 
     for event in merge_events.read() {
+        let count = scale_count_by_fruit(base_count, event.fruit_type);
         let fruit_color = event.fruit_type.placeholder_color();
         let color = resolve_droplet_color(config, fruit_color);
         spawn_droplets(&mut commands, event.position, color, count, config);
@@ -177,8 +200,7 @@ pub fn handle_fruit_landing(
 ) {
     let droplet_cfg = droplet.get();
     let bounce_cfg = bounce.get();
-
-    let count = droplet_cfg
+    let base_count = droplet_cfg
         .map(|c| c.count_landing)
         .unwrap_or(DROPLET_COUNT_LANDING);
 
@@ -187,6 +209,7 @@ pub fn handle_fruit_landing(
             continue;
         }
 
+        let count = scale_count_by_fruit(base_count, *fruit_type);
         let pos = transform.translation.truncate();
         let fruit_color = fruit_type.placeholder_color();
         let color = resolve_droplet_color(droplet_cfg, fruit_color);
@@ -276,6 +299,58 @@ mod tests {
     }
 
     #[test]
+    fn test_scale_count_cherry_uses_base() {
+        // Cherry is stage 0 → multiplier 1.0 → count equals base
+        assert_eq!(
+            scale_count_by_fruit(12, crate::fruit::FruitType::Cherry),
+            12
+        );
+    }
+
+    #[test]
+    fn test_scale_count_watermelon_is_three_times_base() {
+        // Watermelon is stage 10 → multiplier 3.0 → count = base * 3
+        assert_eq!(
+            scale_count_by_fruit(12, crate::fruit::FruitType::Watermelon),
+            36
+        );
+    }
+
+    #[test]
+    fn test_scale_count_increases_with_stage() {
+        let fruits = [
+            crate::fruit::FruitType::Cherry,
+            crate::fruit::FruitType::Grape,
+            crate::fruit::FruitType::Apple,
+            crate::fruit::FruitType::Peach,
+            crate::fruit::FruitType::Watermelon,
+        ];
+        let counts: Vec<u32> = fruits
+            .iter()
+            .map(|f| scale_count_by_fruit(12, *f))
+            .collect();
+        for window in counts.windows(2) {
+            assert!(
+                window[1] >= window[0],
+                "droplet count must be non-decreasing along the evolution chain"
+            );
+        }
+    }
+
+    #[test]
+    fn test_scale_count_never_zero() {
+        for fruit in [
+            crate::fruit::FruitType::Cherry,
+            crate::fruit::FruitType::Watermelon,
+        ] {
+            assert!(
+                scale_count_by_fruit(1, fruit) >= 1,
+                "scaled count must be at least 1"
+            );
+        }
+    }
+
+    #[test]
     fn test_droplet_speed_range_valid() {
         assert!(
             DROPLET_MIN_SPEED < DROPLET_MAX_SPEED,
@@ -313,9 +388,10 @@ mod tests {
             .iter(app.world())
             .count();
 
+        // Cherry is stage 0 → scale 1.0 → count equals the base constant
         assert_eq!(
             count, DROPLET_COUNT_MERGE as usize,
-            "Should spawn exactly DROPLET_COUNT_MERGE droplets"
+            "Cherry (stage 0) should spawn exactly DROPLET_COUNT_MERGE droplets"
         );
     }
 
