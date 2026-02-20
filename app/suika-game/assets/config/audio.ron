@@ -34,4 +34,10 @@ AudioConfig(
     sfx_merge_small_pitch:   1.2,
     sfx_merge_medium_pitch:  1.0,
     sfx_merge_large_pitch:   0.8,
+
+    // --- Combo SFX pitch scaling ---
+    // pitch = 1.0 + (combo_count × sfx_combo_pitch_step).min(sfx_combo_pitch_cap)
+    // e.g. combo 2 → 1.2×, combo 5+ → 1.5×
+    sfx_combo_pitch_step:  0.1,
+    sfx_combo_pitch_cap:   0.5,
 )

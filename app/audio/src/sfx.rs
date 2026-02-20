@@ -7,9 +7,11 @@
 //!
 //! # Registered systems
 //!
-//! | System | Trigger | Description |
-//! |--------|---------|-------------|
-//! | [`play_merge_sfx`] | [`FruitMergeEvent`] | Plays a size-appropriate merge sound with pitch adjustment |
+//! | System | Schedule | Trigger | Description |
+//! |--------|----------|---------|-------------|
+//! | [`play_merge_sfx`]   | `Update`                  | [`FruitMergeEvent`]   | Size-appropriate merge sound with pitch adjustment |
+//! | [`play_combo_sfx`]   | `Update`                  | [`ScoreEarnedEvent`]  | Combo chime with rising pitch |
+//! | [`play_gameover_sfx`]| `OnEnter(GameOver)`       | state transition      | One-shot game-over sting |
 //!
 //! # Pitch mapping
 //!
@@ -25,7 +27,7 @@
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
-use suika_game_core::events::FruitMergeEvent;
+use suika_game_core::events::{FruitMergeEvent, ScoreEarnedEvent};
 use suika_game_core::fruit::FruitType;
 
 use crate::config::{AudioConfig, AudioConfigHandle};
@@ -141,6 +143,92 @@ pub fn play_merge_sfx(
 }
 
 // ---------------------------------------------------------------------------
+// Combo SFX
+// ---------------------------------------------------------------------------
+
+/// Plays the combo sound effect whenever a scoring merge is part of a combo.
+///
+/// A combo is defined as `combo_count >= 2` in [`ScoreEarnedEvent`].  The
+/// pitch rises with each additional combo step, capped at a configurable
+/// maximum, so longer chains sound increasingly energetic.
+///
+/// **Pitch formula:**
+/// ```text
+/// pitch = 1.0 + (combo_count × sfx_combo_pitch_step).min(sfx_combo_pitch_cap)
+/// ```
+/// With defaults: combo 2 → 1.2×, combo 3 → 1.3×, combo 5+ → 1.5×.
+///
+/// Volume and pitch parameters are read from [`AudioConfig`] at call time and
+/// support hot-reload via `assets/config/audio.ron`.
+pub fn play_combo_sfx(
+    mut score_events: MessageReader<ScoreEarnedEvent>,
+    audio: Res<Audio>,
+    sfx_handles: Option<Res<SfxHandles>>,
+    audio_config_handle: Option<Res<AudioConfigHandle>>,
+    audio_config_assets: Res<Assets<AudioConfig>>,
+) {
+    let Some(sfx_handles) = sfx_handles else {
+        return;
+    };
+
+    let default_cfg = AudioConfig::default();
+    let cfg = audio_config_handle
+        .as_ref()
+        .and_then(|h| audio_config_assets.get(&h.0))
+        .unwrap_or(&default_cfg);
+
+    for event in score_events.read() {
+        // Only play the combo sound when a real combo is in progress.
+        if event.combo_count < 2 {
+            continue;
+        }
+
+        let pitch_offset =
+            (event.combo_count as f64 * cfg.sfx_combo_pitch_step).min(cfg.sfx_combo_pitch_cap);
+        let pitch = 1.0 + pitch_offset;
+
+        audio
+            .play(sfx_handles.combo.clone())
+            .with_volume(cfg.sfx_combo_volume)
+            .with_playback_rate(pitch);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Game-over SFX
+// ---------------------------------------------------------------------------
+
+/// Plays the game-over sound effect once when the game transitions to
+/// [`AppState::GameOver`].
+///
+/// This system is scheduled on [`OnEnter(AppState::GameOver)`] so it fires
+/// exactly once per game-over, regardless of frame rate.
+///
+/// Volume is read from [`AudioConfig`] at call time.
+pub fn play_gameover_sfx(
+    audio: Res<Audio>,
+    sfx_handles: Option<Res<SfxHandles>>,
+    audio_config_handle: Option<Res<AudioConfigHandle>>,
+    audio_config_assets: Res<Assets<AudioConfig>>,
+) {
+    let Some(sfx_handles) = sfx_handles else {
+        return;
+    };
+
+    let default_cfg = AudioConfig::default();
+    let cfg = audio_config_handle
+        .as_ref()
+        .and_then(|h| audio_config_assets.get(&h.0))
+        .unwrap_or(&default_cfg);
+
+    audio
+        .play(sfx_handles.gameover.clone())
+        .with_volume(cfg.sfx_gameover_volume);
+
+    info!("Game-over SFX playing");
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -247,5 +335,41 @@ mod tests {
             cfg.sfx_merge_large_pitch > 0.0,
             "large pitch must be positive"
         );
+    }
+
+    #[test]
+    fn test_combo_pitch_formula_at_various_counts() {
+        let cfg = AudioConfig::default();
+
+        // Helper that mirrors the in-system formula.
+        let combo_pitch = |count: u32| -> f64 {
+            1.0 + (count as f64 * cfg.sfx_combo_pitch_step).min(cfg.sfx_combo_pitch_cap)
+        };
+
+        // No pitch offset for a single merge (combo_count = 1 is skipped).
+        assert!((combo_pitch(1) - 1.1_f64).abs() < f64::EPSILON);
+
+        // Pitch increases with combo count.
+        assert!(
+            combo_pitch(3) > combo_pitch(2),
+            "pitch must increase with combo"
+        );
+
+        // Pitch caps at 1.0 + sfx_combo_pitch_cap.
+        let max = 1.0 + cfg.sfx_combo_pitch_cap;
+        assert!(
+            (combo_pitch(100) - max).abs() < f64::EPSILON,
+            "pitch must be capped at {max}"
+        );
+    }
+
+    #[test]
+    fn test_combo_pitch_step_and_cap_are_positive() {
+        let cfg = AudioConfig::default();
+        assert!(
+            cfg.sfx_combo_pitch_step > 0.0,
+            "pitch step must be positive"
+        );
+        assert!(cfg.sfx_combo_pitch_cap > 0.0, "pitch cap must be positive");
     }
 }
