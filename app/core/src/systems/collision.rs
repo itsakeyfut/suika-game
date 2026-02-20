@@ -1,12 +1,22 @@
 //! Fruit collision detection system
 //!
-//! This module monitors Rapier2D collision events and detects when two fruits
-//! of the same type collide, triggering the merge system via `FruitMergeEvent`.
+//! This module polls Rapier2D contact pairs every frame to detect when two fruits
+//! of the same type are touching, triggering the merge system via `FruitMergeEvent`.
+//!
+//! # Why polling instead of `CollisionEvent::Started`
+//!
+//! `CollisionEvent::Started` fires only once when contact *begins*. In a densely
+//! packed container, two same-type fruits can be pressed into each other gradually
+//! (e.g. squeezed by a third fruit landing on top) without ever generating a new
+//! `Started` event. The merge would be permanently missed.
+//!
+//! By polling `rapier_context.simulation.contact_pairs()` each frame we catch
+//! all *currently active* contacts, so no merge opportunity is ever skipped.
 
 use std::collections::HashSet;
 
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::CollisionEvent;
+use bevy_rapier2d::prelude::ReadRapierContext;
 
 use crate::components::{Fruit, FruitSpawnState, MergeCandidate};
 use crate::events::FruitMergeEvent;
@@ -15,18 +25,24 @@ use crate::fruit::FruitType;
 /// Resource tracking entity pairs processed this frame to prevent duplicate merge events
 ///
 /// Stores normalized (min, max) entity pairs to ensure each collision is only
-/// processed once per frame, even if multiple collision events fire for the same pair.
+/// processed once per frame, even if multiple contact pairs fire for the same pair.
 #[derive(Resource, Default)]
 pub struct ProcessedCollisions {
     pub pairs: HashSet<(Entity, Entity)>,
 }
 
-/// Detects collisions between fruits of the same type and fires `FruitMergeEvent`
+/// Detects active contacts between fruits of the same type and fires `FruitMergeEvent`
 ///
-/// This system reads Rapier2D `CollisionEvent::Started` events and checks whether
-/// both entities are fruits with the same `FruitType`. When a valid merge is
-/// detected, both fruits are marked with `MergeCandidate` and a `FruitMergeEvent`
-/// is sent.
+/// Each frame this system polls `rapier_context.simulation.contact_pairs()` and
+/// checks whether both entities are fruits with the same `FruitType`. When a valid
+/// merge is detected, both fruits are marked with `MergeCandidate` and a
+/// `FruitMergeEvent` is sent.
+///
+/// # Why polling
+///
+/// Using `CollisionEvent::Started` misses merges that occur when fruits are slowly
+/// pressed together (no new contact-start event fires). Polling active contact pairs
+/// every frame ensures every touching same-type pair is eventually merged.
 ///
 /// # Deduplication
 ///
@@ -36,25 +52,37 @@ pub struct ProcessedCollisions {
 ///
 /// # Conditions for a merge
 ///
+/// - The contact pair must have at least one active contact point
 /// - Both entities must have the `Fruit` component
 /// - Neither entity may already be a `MergeCandidate`
 /// - Neither may be in `FruitSpawnState::Held` state (still aimed by the player)
 /// - Both must have the same `FruitType`
 #[allow(clippy::type_complexity)]
-pub fn detect_fruit_collision(
+pub fn detect_fruit_contact(
     mut commands: Commands,
-    mut collision_events: MessageReader<CollisionEvent>,
+    rapier_context: ReadRapierContext,
     fruit_query: Query<(&FruitType, &FruitSpawnState), (With<Fruit>, Without<MergeCandidate>)>,
     transform_query: Query<&Transform>,
     mut merge_events: MessageWriter<FruitMergeEvent>,
     mut processed: ResMut<ProcessedCollisions>,
 ) {
-    for event in collision_events.read() {
-        let CollisionEvent::Started(entity1, entity2, _flags) = event else {
+    let Ok(ctx) = rapier_context.single() else {
+        return;
+    };
+
+    for contact_pair in ctx
+        .simulation
+        .contact_pairs(ctx.colliders, ctx.rigidbody_set)
+    {
+        // Only consider pairs with at least one active contact point
+        if !contact_pair.has_any_active_contact() {
+            continue;
+        }
+
+        let (Some(entity1), Some(entity2)) = (contact_pair.collider1(), contact_pair.collider2())
+        else {
             continue;
         };
-
-        let (entity1, entity2) = (*entity1, *entity2);
 
         // Normalize pair to prevent duplicate processing (smaller entity first)
         let pair = if entity1 < entity2 {

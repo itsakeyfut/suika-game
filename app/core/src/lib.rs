@@ -177,11 +177,10 @@ impl Plugin for GameCorePlugin {
         app.add_systems(
             Update,
             (
-                systems::collision::detect_fruit_collision,
-                systems::merge::handle_fruit_merge
-                    .after(systems::collision::detect_fruit_collision),
+                systems::collision::detect_fruit_contact,
+                systems::merge::handle_fruit_merge.after(systems::collision::detect_fruit_contact),
                 systems::score::update_score_on_merge
-                    .after(systems::collision::detect_fruit_collision),
+                    .after(systems::collision::detect_fruit_contact),
                 systems::collision::clear_processed_collisions
                     .after(systems::merge::handle_fruit_merge)
                     .after(systems::score::update_score_on_merge),
