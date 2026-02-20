@@ -135,14 +135,20 @@ pub fn detect_fruit_contact(
         let pos1 = match transform_query.get(entity1) {
             Ok(t) => t.translation.truncate(),
             Err(_) => {
-                warn!("detect_fruit_contact: entity1 {:?} has no Transform", entity1);
+                warn!(
+                    "detect_fruit_contact: entity1 {:?} has no Transform",
+                    entity1
+                );
                 Vec2::ZERO
             }
         };
         let pos2 = match transform_query.get(entity2) {
             Ok(t) => t.translation.truncate(),
             Err(_) => {
-                warn!("detect_fruit_contact: entity2 {:?} has no Transform", entity2);
+                warn!(
+                    "detect_fruit_contact: entity2 {:?} has no Transform",
+                    entity2
+                );
                 Vec2::ZERO
             }
         };
