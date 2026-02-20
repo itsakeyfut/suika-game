@@ -66,6 +66,7 @@ pub mod prelude {
     pub use crate::fruit::{FruitParams, FruitType};
 
     // Resources
+    pub use crate::resources::settings::{Language, SettingsResource};
     pub use crate::resources::{ComboTimer, GameOverTimer, GameState, NextFruitType};
     pub use crate::systems::input::{InputMode, LastCursorPosition, SpawnPosition};
 
@@ -76,7 +77,10 @@ pub mod prelude {
     pub use crate::constants;
 
     // Persistence
-    pub use crate::persistence::{HighscoreData, load_highscore, save_highscore, update_highscore};
+    pub use crate::persistence::{
+        HighscoreData, load_highscore, load_settings, save_highscore, save_settings,
+        update_highscore,
+    };
 
     // Systems
     pub use crate::systems;
@@ -159,12 +163,19 @@ impl Plugin for GameCorePlugin {
             .init_resource::<resources::ComboTimer>()
             .init_resource::<resources::GameOverTimer>()
             .init_resource::<resources::NextFruitType>()
+            .init_resource::<resources::SettingsResource>()
             .init_resource::<systems::input::SpawnPosition>()
             .init_resource::<systems::input::InputMode>()
             .init_resource::<systems::input::LastCursorPosition>();
 
-        // Load persisted highscore into GameState at startup
-        app.add_systems(Startup, persistence::load_highscore_startup);
+        // Load persisted data into resources at startup
+        app.add_systems(
+            Startup,
+            (
+                persistence::load_highscore_startup,
+                persistence::load_settings_startup,
+            ),
+        );
 
         // Register events
         app.add_message::<events::FruitMergeEvent>();
@@ -194,14 +205,27 @@ impl Plugin for GameCorePlugin {
         );
 
         // Visual effects — all gated on Playing so they freeze during Paused.
+        //
+        // Two groups:
+        //   1. Always-on: squash-stretch bounce (preserves physical feel)
+        //   2. Effects-gated: particles, flash, shake, watermelon burst
+        //      (disabled when SettingsResource::effects_enabled is false)
         app.add_systems(
             Update,
             (
-                // Merge scale animation
+                // Merge scale animation (always on while Playing)
                 systems::effects::animate_merge_scale.after(systems::merge::handle_fruit_merge),
-                // Squash-and-stretch bounce
+                // Squash-and-stretch bounce (always on — physical feel)
                 systems::effects::bounce::animate_squash_stretch
                     .after(systems::merge::handle_fruit_merge),
+            )
+                .run_if(in_state(states::AppState::Playing)),
+        );
+
+        // Particle / flash / shake effects — gated on both Playing AND effects_enabled.
+        app.add_systems(
+            Update,
+            (
                 // Water droplet particles
                 systems::effects::droplet::spawn_merge_droplets
                     .after(systems::merge::handle_fruit_merge),
@@ -220,7 +244,8 @@ impl Plugin for GameCorePlugin {
                 systems::effects::watermelon::animate_watermelon_explosion,
                 systems::effects::watermelon::update_watermelon_burst_particles,
             )
-                .run_if(in_state(states::AppState::Playing)),
+                .run_if(in_state(states::AppState::Playing))
+                .run_if(|settings: Res<resources::SettingsResource>| settings.effects_enabled),
         );
 
         // Camera shake apply runs every frame (not gated on Playing) so that

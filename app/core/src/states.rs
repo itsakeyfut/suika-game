@@ -15,6 +15,10 @@ use bevy::prelude::*;
 ///
 /// - `Loading` → `Title`: All required RON configs have finished loading
 /// - `Title` → `Playing`: Player starts a new game
+/// - `Title` → `Settings`: Player opens the settings screen
+/// - `Title` → `HowToPlay`: Player opens the how-to-play screen
+/// - `Settings` → `Title`: Player presses back
+/// - `HowToPlay` → `Title`: Player presses back
 /// - `Playing` → `Paused`: Player pauses the game
 /// - `Paused` → `Playing`: Player resumes the game
 /// - `Playing` → `GameOver`: Game over condition is met
@@ -53,6 +57,17 @@ pub enum AppState {
     ///
     /// Displays the game title, menu options, and high score.
     Title,
+
+    /// Settings screen state
+    ///
+    /// Displays adjustable settings: BGM volume, SFX volume, visual effects
+    /// toggle, and language selection.  Changes are persisted immediately.
+    Settings,
+
+    /// How-to-play screen state
+    ///
+    /// Shows a two-column layout explaining the game rules.
+    HowToPlay,
 
     /// Active gameplay state
     ///
@@ -120,6 +135,8 @@ mod tests {
         let states = [
             AppState::Loading,
             AppState::Title,
+            AppState::Settings,
+            AppState::HowToPlay,
             AppState::Playing,
             AppState::Paused,
             AppState::GameOver,

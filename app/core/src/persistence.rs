@@ -1,11 +1,19 @@
-//! Highscore persistence
+//! Persistence helpers for highscore and settings.
 //!
-//! This module handles saving and loading the player's highscore
-//! to/from a JSON file on disk. The highscore persists across
-//! game sessions.
+//! This module handles saving and loading data to/from JSON files on disk.
+//! Data persists across game sessions.
 //!
-//! Also exposes [`load_highscore_startup`], a Bevy startup system that reads
-//! the persisted highscore into [`GameState`] once at launch.
+//! ## Files
+//!
+//! | File | Content |
+//! |------|---------|
+//! | `save/highscore.json` | All-time best score |
+//! | `save/settings.json`  | User preferences (volume, effects, language) |
+//!
+//! ## Startup systems
+//!
+//! - [`load_highscore_startup`] — reads highscore into [`GameState`]
+//! - [`load_settings_startup`]  — reads settings into [`SettingsResource`]
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -14,6 +22,7 @@ use std::path::Path;
 
 use crate::constants::storage::SAVE_DIR;
 use crate::resources::GameState;
+use crate::resources::settings::SettingsResource;
 
 /// Highscore data structure
 ///
@@ -165,6 +174,56 @@ pub fn load_highscore_startup(mut game_state: ResMut<GameState>) {
     let data = load_highscore(std::path::Path::new(SAVE_DIR));
     game_state.highscore = data.highscore;
     info!("Highscore loaded: {}", data.highscore);
+}
+
+// ---------------------------------------------------------------------------
+// Settings persistence
+// ---------------------------------------------------------------------------
+
+/// Saves the user's [`SettingsResource`] to `{save_dir}/settings.json`.
+///
+/// Creates the save directory if it does not yet exist.
+///
+/// # Returns
+///
+/// * `Ok(())` on success
+/// * `Err` if the directory cannot be created or the file cannot be written
+pub fn save_settings(
+    settings: &SettingsResource,
+    save_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(save_dir)?;
+    let json = serde_json::to_string_pretty(settings)?;
+    fs::write(save_dir.join("settings.json"), json)?;
+    Ok(())
+}
+
+/// Loads [`SettingsResource`] from `{save_dir}/settings.json`.
+///
+/// Returns [`SettingsResource::default`] when the file does not exist or
+/// cannot be parsed, so the game always has a usable value.
+pub fn load_settings(save_dir: &Path) -> SettingsResource {
+    let file_path = save_dir.join("settings.json");
+
+    if !file_path.exists() {
+        return SettingsResource::default();
+    }
+
+    match fs::read_to_string(&file_path) {
+        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+        Err(_) => SettingsResource::default(),
+    }
+}
+
+/// Bevy startup system: reads the persisted settings into [`SettingsResource`].
+///
+/// Runs once at [`Startup`], overwriting the default-initialised resource with
+/// the values stored on disk so every screen starts with the player's last
+/// chosen preferences.
+pub fn load_settings_startup(mut settings: ResMut<SettingsResource>) {
+    let loaded = load_settings(std::path::Path::new(SAVE_DIR));
+    *settings = loaded;
+    info!("Settings loaded from disk");
 }
 
 #[cfg(test)]
