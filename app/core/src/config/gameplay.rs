@@ -401,8 +401,7 @@ pub fn hot_reload_physics_config(
         (Entity, &Transform, &crate::fruit::FruitType),
         (With<Fruit>, Without<Container>, Without<BoundaryLine>),
     >,
-    fruits_config_handle: Res<FruitsConfigHandle>,
-    fruits_config_assets: Res<Assets<FruitsConfig>>,
+    fruits: FruitsParams,
 ) {
     for event in events.read() {
         match event {
@@ -450,9 +449,7 @@ pub fn hot_reload_physics_config(
                     // CRITICAL: Delete out-of-bounds fruits BEFORE updating walls
                     let mut deleted_count = 0;
                     for (entity, transform, fruit_type) in fruits_query.iter() {
-                        let radius = if let Some(fruits_config) =
-                            fruits_config_assets.get(&fruits_config_handle.0)
-                        {
+                        let radius = if let Some(fruits_config) = fruits.get() {
                             fruit_type
                                 .try_parameters_from_config(fruits_config)
                                 .map(|p| p.radius)
@@ -521,10 +518,8 @@ pub fn hot_reload_game_rules_config(
     config_assets: Res<Assets<GameRulesConfig>>,
     config_handle: Res<GameRulesConfigHandle>,
     mut preview_query: Query<(&mut Transform, &mut Sprite), With<NextFruitPreview>>,
-    physics_handle: Res<PhysicsConfigHandle>,
-    physics_assets: Res<Assets<PhysicsConfig>>,
-    fruits_handle: Res<FruitsConfigHandle>,
-    fruits_assets: Res<Assets<FruitsConfig>>,
+    physics: PhysicsParams,
+    fruits: FruitsParams,
     next_fruit: Res<crate::resources::NextFruitType>,
     mut combo_timer: ResMut<crate::resources::ComboTimer>,
     mut game_over_timer: ResMut<crate::resources::GameOverTimer>,
@@ -547,8 +542,8 @@ pub fn hot_reload_game_rules_config(
 
                     update_game_timers(&mut combo_timer, &mut game_over_timer, config);
 
-                    if let Some(physics_config) = physics_assets.get(&physics_handle.0)
-                        && let Some(fruits_config) = fruits_assets.get(&fruits_handle.0)
+                    if let Some(physics_config) = physics.get()
+                        && let Some(fruits_config) = fruits.get()
                         && let Ok((mut transform, mut sprite)) = preview_query.single_mut()
                     {
                         update_preview(

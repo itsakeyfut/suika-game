@@ -45,6 +45,23 @@ impl<'w> BounceParams<'w> {
 }
 
 // ---------------------------------------------------------------------------
+// DropletColorMode
+// ---------------------------------------------------------------------------
+
+/// Controls how water droplet color is determined
+///
+/// - `Water`: all droplets use the fixed base color (a blue-ish water tone)
+/// - `Juice`: droplets inherit the color of the fruit that triggered them
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DropletColorMode {
+    /// Use the fixed water color defined in `DropletConfig.color`
+    #[default]
+    Water,
+    /// Use the triggering fruit's placeholder color
+    Juice,
+}
+
+// ---------------------------------------------------------------------------
 // DropletConfig
 // ---------------------------------------------------------------------------
 
@@ -58,7 +75,7 @@ pub struct DropletConfig {
     pub radius: f32,
     /// Base RGBA color used when `color_mode` is `Water`
     pub color: crate::config::gameplay::RonColor,
-    pub color_mode: crate::systems::effects::droplet::DropletColorMode,
+    pub color_mode: DropletColorMode,
     pub min_speed: f32,
     pub max_speed: f32,
     pub lifetime_min: f32,
@@ -384,10 +401,7 @@ DropletConfig(
         assert_eq!(config.count_merge, 12);
         assert_eq!(config.count_landing, 5);
         assert_eq!(config.radius, 2.5);
-        assert_eq!(
-            config.color_mode,
-            crate::systems::effects::droplet::DropletColorMode::Juice
-        );
+        assert_eq!(config.color_mode, DropletColorMode::Juice);
         assert_eq!(config.min_speed, 80.0);
         assert_eq!(config.max_speed, 350.0);
         assert_eq!(config.gravity, -600.0);

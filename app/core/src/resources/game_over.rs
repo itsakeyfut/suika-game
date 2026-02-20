@@ -9,7 +9,7 @@ pub(crate) const DEFAULT_WARNING_THRESHOLD: f32 = 0.5;
 ///
 /// Tracks how long fruits have been above the boundary line.
 /// Game over occurs when fruits stay above the line for the full duration
-/// of the warning threshold (default 3.0 seconds).
+/// of the warning threshold (default 0.5 seconds).
 #[derive(Resource, Debug, Clone)]
 pub struct GameOverTimer {
     /// Time in seconds that fruits have been above the boundary
@@ -44,6 +44,7 @@ impl GameOverTimer {
     pub fn reset(&mut self) {
         self.time_over_boundary = 0.0;
         self.is_warning = false;
+        self.warning_threshold = DEFAULT_WARNING_THRESHOLD;
     }
 
     /// Resets session state while preserving config values.
@@ -62,6 +63,9 @@ impl GameOverTimer {
 
     /// Returns the progress toward game over (0.0 to 1.0)
     pub fn warning_progress(&self) -> f32 {
+        if self.warning_threshold <= 0.0 {
+            return 1.0;
+        }
         (self.time_over_boundary / self.warning_threshold).min(1.0)
     }
 }

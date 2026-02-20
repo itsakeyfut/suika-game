@@ -6,30 +6,14 @@
 
 use bevy::prelude::*;
 use rand::RngExt;
-use serde::Deserialize;
 
 use crate::components::{Fruit, FruitSpawnState};
 use crate::config::{
-    BounceConfig, BounceConfigHandle, DropletConfig, DropletParams, PhysicsConfig,
-    PhysicsConfigHandle,
+    BounceConfig, BounceConfigHandle, DropletColorMode, DropletConfig, DropletParams,
+    PhysicsConfig, PhysicsConfigHandle,
 };
 use crate::events::FruitMergeEvent;
 use crate::systems::effects::bounce::SquashStretchAnimation;
-
-// --- Color Mode ---
-
-/// Controls how water droplet color is determined
-///
-/// - `Water`: all droplets use the fixed base color (a blue-ish water tone)
-/// - `Juice`: droplets inherit the color of the fruit that triggered them
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DropletColorMode {
-    /// Use the fixed water color defined in `DropletConfig.color`
-    #[default]
-    Water,
-    /// Use the triggering fruit's placeholder color
-    Juice,
-}
 
 // --- Constants ---
 

@@ -83,11 +83,12 @@ pub mod prelude {
 
     // Config
     pub use crate::config::{
-        BounceConfig, BounceConfigHandle, BounceParams, DropletConfig, DropletConfigHandle,
-        DropletParams, FlashConfig, FlashConfigHandle, FlashParams, FruitConfigEntry, FruitsConfig,
-        FruitsConfigHandle, FruitsParams, GameConfigPlugin, GameRulesConfig, GameRulesConfigHandle,
-        GameRulesParams, PhysicsConfig, PhysicsConfigHandle, PhysicsParams, RonColor, ShakeConfig,
-        ShakeConfigHandle, ShakeParams, WatermelonConfig, WatermelonConfigHandle, WatermelonParams,
+        BounceConfig, BounceConfigHandle, BounceParams, DropletColorMode, DropletConfig,
+        DropletConfigHandle, DropletParams, FlashConfig, FlashConfigHandle, FlashParams,
+        FruitConfigEntry, FruitsConfig, FruitsConfigHandle, FruitsParams, GameConfigPlugin,
+        GameRulesConfig, GameRulesConfigHandle, GameRulesParams, PhysicsConfig,
+        PhysicsConfigHandle, PhysicsParams, RonColor, ShakeConfig, ShakeConfigHandle, ShakeParams,
+        WatermelonConfig, WatermelonConfigHandle, WatermelonParams,
     };
 
     // Events
@@ -105,7 +106,7 @@ pub mod prelude {
     // Effects
     pub use crate::systems::effects::MergeAnimation;
     pub use crate::systems::effects::bounce::SquashStretchAnimation;
-    pub use crate::systems::effects::droplet::{DropletColorMode, WaterDroplet};
+    pub use crate::systems::effects::droplet::WaterDroplet;
     pub use crate::systems::effects::flash::{LocalFlashAnimation, ScreenFlashAnimation};
     pub use crate::systems::effects::shake::CameraShake;
     pub use crate::systems::effects::watermelon::{
