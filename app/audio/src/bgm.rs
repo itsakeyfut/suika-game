@@ -23,6 +23,7 @@ use bevy_kira_audio::prelude::*;
 use std::time::Duration;
 use suika_game_core::prelude::AppState;
 
+use crate::channels::BgmChannel;
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::BgmHandles;
 
@@ -62,10 +63,14 @@ pub struct CurrentBgm {
 /// Returns the [`BgmTrack`] that should play for the given [`AppState`].
 ///
 /// This is a pure function with no side effects — useful for unit testing.
+///
+/// Settings and HowToPlay share the Title track so navigating those screens
+/// does not restart the music.
 pub fn desired_track(state: &AppState) -> BgmTrack {
     match state {
         AppState::Loading => BgmTrack::None,
-        AppState::Title => BgmTrack::Title,
+        // Settings / HowToPlay are menu overlays — keep the title music running.
+        AppState::Title | AppState::Settings | AppState::HowToPlay => BgmTrack::Title,
         // Paused keeps the game track so the music doesn't cut out on pause.
         AppState::Playing | AppState::Paused => BgmTrack::Game,
         AppState::GameOver => BgmTrack::GameOver,
@@ -99,7 +104,7 @@ pub fn desired_track(state: &AppState) -> BgmTrack {
 pub fn switch_bgm_on_state_change(
     current_state: Res<State<AppState>>,
     mut current_bgm: ResMut<CurrentBgm>,
-    audio: Res<Audio>,
+    bgm_channel: Res<AudioChannel<BgmChannel>>,
     bgm_handles: Option<Res<BgmHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
@@ -123,19 +128,20 @@ pub fn switch_bgm_on_state_change(
         .unwrap_or(&default_cfg);
 
     // Fade out the currently-playing track.
-    audio
+    bgm_channel
         .stop()
         .fade_out(AudioTween::linear(Duration::from_secs_f32(
             cfg.bgm_fade_out_secs,
         )));
 
-    // Start the new track.
+    // Start the new track.  Per-sound volumes are design levels from AudioConfig;
+    // the overall user volume is applied separately via AudioChannel::set_volume.
     match desired {
         BgmTrack::None => {
             // Already stopped above; nothing more to do.
         }
         BgmTrack::Title => {
-            audio
+            bgm_channel
                 .play(bgm_handles.title.clone())
                 .looped()
                 .with_volume(cfg.bgm_title_volume)
@@ -144,7 +150,7 @@ pub fn switch_bgm_on_state_change(
                 )));
         }
         BgmTrack::Game => {
-            audio
+            bgm_channel
                 .play(bgm_handles.game.clone())
                 .looped()
                 .with_volume(cfg.bgm_game_volume)
@@ -154,7 +160,7 @@ pub fn switch_bgm_on_state_change(
         }
         BgmTrack::GameOver => {
             // One-shot: no loop, no fade-in.
-            audio
+            bgm_channel
                 .play(bgm_handles.gameover.clone())
                 .with_volume(cfg.bgm_gameover_volume);
         }
@@ -219,6 +225,17 @@ mod tests {
     }
 
     #[test]
+    fn test_desired_track_settings_is_title() {
+        // Settings and HowToPlay share the Title track to avoid music restart.
+        assert_eq!(desired_track(&AppState::Settings), BgmTrack::Title);
+    }
+
+    #[test]
+    fn test_desired_track_how_to_play_is_title() {
+        assert_eq!(desired_track(&AppState::HowToPlay), BgmTrack::Title);
+    }
+
+    #[test]
     fn test_desired_track_playing_is_game() {
         assert_eq!(desired_track(&AppState::Playing), BgmTrack::Game);
     }
@@ -248,6 +265,8 @@ mod tests {
         let states = [
             AppState::Loading,
             AppState::Title,
+            AppState::Settings,
+            AppState::HowToPlay,
             AppState::Playing,
             AppState::Paused,
             AppState::GameOver,

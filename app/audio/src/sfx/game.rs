@@ -5,6 +5,7 @@ use bevy_kira_audio::prelude::*;
 use suika_game_core::events::{FruitMergeEvent, ScoreEarnedEvent};
 
 use super::MergeSfxCategory;
+use crate::channels::SfxChannel;
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::SfxHandles;
 
@@ -20,7 +21,7 @@ use crate::handles::SfxHandles;
 /// `assets/config/audio.ron` (hot-reload).
 pub fn play_merge_sfx(
     mut merge_events: MessageReader<FruitMergeEvent>,
-    audio: Res<Audio>,
+    sfx_channel: Res<AudioChannel<SfxChannel>>,
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
@@ -39,26 +40,26 @@ pub fn play_merge_sfx(
     for event in merge_events.read() {
         match MergeSfxCategory::from_fruit(event.fruit_type) {
             MergeSfxCategory::Small => {
-                audio
+                sfx_channel
                     .play(sfx_handles.merge_small.clone())
                     .with_volume(cfg.sfx_merge_small_volume)
                     .with_playback_rate(cfg.sfx_merge_small_pitch);
             }
             MergeSfxCategory::Medium => {
-                audio
+                sfx_channel
                     .play(sfx_handles.merge_medium.clone())
                     .with_volume(cfg.sfx_merge_medium_volume)
                     .with_playback_rate(cfg.sfx_merge_medium_pitch);
             }
             MergeSfxCategory::Large => {
-                audio
+                sfx_channel
                     .play(sfx_handles.merge_large.clone())
                     .with_volume(cfg.sfx_merge_large_volume)
                     .with_playback_rate(cfg.sfx_merge_large_pitch);
             }
             MergeSfxCategory::Watermelon => {
                 // Special fanfare — no pitch shift, played at full original pitch.
-                audio
+                sfx_channel
                     .play(sfx_handles.watermelon.clone())
                     .with_volume(cfg.sfx_watermelon_volume);
                 info!("Watermelon! Playing fanfare SFX");
@@ -80,7 +81,7 @@ pub fn play_merge_sfx(
 /// With defaults: combo 2 → 1.2×, combo 3 → 1.3×, combo 5+ → 1.5×.
 pub fn play_combo_sfx(
     mut score_events: MessageReader<ScoreEarnedEvent>,
-    audio: Res<Audio>,
+    sfx_channel: Res<AudioChannel<SfxChannel>>,
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
@@ -106,7 +107,7 @@ pub fn play_combo_sfx(
         // Guard against misconfigured negative offsets; pitch must stay > 0.
         let pitch = (1.0_f64 + pitch_offset).max(0.1);
 
-        audio
+        sfx_channel
             .play(sfx_handles.combo.clone())
             .with_volume(cfg.sfx_combo_volume)
             .with_playback_rate(pitch);
@@ -119,7 +120,7 @@ pub fn play_combo_sfx(
 /// This system is scheduled on [`OnEnter(AppState::GameOver)`] so it fires
 /// exactly once per game-over, regardless of frame rate.
 pub fn play_gameover_sfx(
-    audio: Res<Audio>,
+    sfx_channel: Res<AudioChannel<SfxChannel>>,
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
@@ -134,7 +135,7 @@ pub fn play_gameover_sfx(
         .and_then(|h| audio_config_assets.get(&h.0))
         .unwrap_or(&default_cfg);
 
-    audio
+    sfx_channel
         .play(sfx_handles.gameover.clone())
         .with_volume(cfg.sfx_gameover_volume);
 
