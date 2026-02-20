@@ -346,7 +346,8 @@ mod tests {
             1.0 + (count as f64 * cfg.sfx_combo_pitch_step).min(cfg.sfx_combo_pitch_cap)
         };
 
-        // No pitch offset for a single merge (combo_count = 1 is skipped).
+        // combo_count = 1 is skipped by the system guard (`< 2`), but the
+        // formula would yield 1.1× if it were evaluated.
         assert!((combo_pitch(1) - 1.1_f64).abs() < f64::EPSILON);
 
         // Pitch increases with combo count.
