@@ -16,7 +16,7 @@
 use bevy::prelude::*;
 use rand::RngExt;
 
-use crate::config::{WatermelonConfig, WatermelonConfigHandle};
+use crate::config::WatermelonParams;
 use crate::events::FruitMergeEvent;
 use crate::fruit::FruitType;
 use crate::systems::effects::shake::CameraShake;
@@ -104,13 +104,9 @@ pub fn spawn_watermelon_effects(
     mut commands: Commands,
     mut merge_events: MessageReader<FruitMergeEvent>,
     mut shake_query: Query<&mut CameraShake>,
-    config_handle: Option<Res<WatermelonConfigHandle>>,
-    config_assets: Option<Res<Assets<WatermelonConfig>>>,
+    config: WatermelonParams<'_>,
 ) {
-    let cfg = config_handle
-        .as_ref()
-        .zip(config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let cfg = config.get();
 
     let ring_duration = cfg
         .map(|c| c.ring_duration)

@@ -83,10 +83,11 @@ pub mod prelude {
 
     // Config
     pub use crate::config::{
-        BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, FlashConfig,
-        FlashConfigHandle, FruitConfigEntry, FruitsConfig, FruitsConfigHandle, GameConfigPlugin,
-        GameRulesConfig, GameRulesConfigHandle, PhysicsConfig, PhysicsConfigHandle, RonColor,
-        ShakeConfig, ShakeConfigHandle, WatermelonConfig, WatermelonConfigHandle,
+        BounceConfig, BounceConfigHandle, BounceParams, DropletConfig, DropletConfigHandle,
+        DropletParams, FlashConfig, FlashConfigHandle, FlashParams, FruitConfigEntry, FruitsConfig,
+        FruitsConfigHandle, FruitsParams, GameConfigPlugin, GameRulesConfig, GameRulesConfigHandle,
+        GameRulesParams, PhysicsConfig, PhysicsConfigHandle, PhysicsParams, RonColor, ShakeConfig,
+        ShakeConfigHandle, ShakeParams, WatermelonConfig, WatermelonConfigHandle, WatermelonParams,
     };
 
     // Events
