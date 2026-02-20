@@ -8,6 +8,7 @@ use suika_game_core::prelude::{AppState, GameOverSet};
 pub mod camera;
 pub mod components;
 pub mod config;
+pub mod i18n;
 pub mod screens;
 pub mod styles;
 
@@ -28,6 +29,24 @@ impl Plugin for GameUIPlugin {
             .init_resource::<components::KeyboardFocusIndex>()
             // Title screen
             .add_systems(OnEnter(AppState::Title), screens::title::setup_title_screen)
+            // Settings screen
+            .add_systems(
+                OnEnter(AppState::Settings),
+                screens::settings::setup_settings_screen,
+            )
+            .add_systems(
+                Update,
+                (
+                    screens::settings::update_settings_display,
+                    screens::settings::update_translatable_texts,
+                )
+                    .run_if(in_state(AppState::Settings)),
+            )
+            // How-to-play screen
+            .add_systems(
+                OnEnter(AppState::HowToPlay),
+                screens::how_to_play::setup_how_to_play_screen,
+            )
             // HUD: spawn layout on enter Playing, run widget updates each frame
             .add_systems(OnEnter(AppState::Playing), screens::hud::setup_hud)
             .add_systems(
