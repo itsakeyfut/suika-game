@@ -185,7 +185,8 @@ pub fn play_combo_sfx(
 
         let pitch_offset =
             (event.combo_count as f64 * cfg.sfx_combo_pitch_step).min(cfg.sfx_combo_pitch_cap);
-        let pitch = 1.0 + pitch_offset;
+        // Guard against misconfigured negative offsets; pitch must stay > 0.
+        let pitch = (1.0_f64 + pitch_offset).max(0.1);
 
         audio
             .play(sfx_handles.combo.clone())

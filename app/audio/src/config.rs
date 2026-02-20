@@ -272,6 +272,20 @@ impl AssetLoader for AudioConfigLoader {
             }
         }
 
+        // Combo pitch parameters must also be positive so the formula
+        // `1.0 + (count × step).min(cap)` always produces a pitch ≥ 1.0.
+        for (name, value) in [
+            ("sfx_combo_pitch_step", cfg.sfx_combo_pitch_step),
+            ("sfx_combo_pitch_cap", cfg.sfx_combo_pitch_cap),
+        ] {
+            if value <= 0.0 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("{name} must be > 0.0, got {value}"),
+                ));
+            }
+        }
+
         Ok(cfg)
     }
 
@@ -430,6 +444,21 @@ AudioConfig(
         assert!(
             DEFAULT_SFX_MERGE_LARGE_PITCH > 0.0,
             "default large pitch must be > 0"
+        );
+    }
+
+    #[test]
+    fn test_combo_pitch_params_defaults_are_positive() {
+        // The loader rejects sfx_combo_pitch_step and sfx_combo_pitch_cap ≤ 0.
+        // Verify that the built-in defaults satisfy this constraint so a default
+        // AudioConfig is never rejected.
+        assert!(
+            DEFAULT_SFX_COMBO_PITCH_STEP > 0.0,
+            "default combo pitch step must be > 0"
+        );
+        assert!(
+            DEFAULT_SFX_COMBO_PITCH_CAP > 0.0,
+            "default combo pitch cap must be > 0"
         );
     }
 }
