@@ -59,8 +59,11 @@ impl Plugin for GameAudioPlugin {
                     bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
                     config::hot_reload_audio_config,
                     sfx::play_merge_sfx,
+                    sfx::play_combo_sfx,
                 ),
-            );
+            )
+            // One-shot systems triggered by state transitions
+            .add_systems(OnEnter(AppState::GameOver), sfx::play_gameover_sfx);
 
         info!("GameAudioPlugin initialized (bevy_kira_audio ready)");
     }

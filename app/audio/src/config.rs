@@ -92,6 +92,17 @@ pub struct AudioConfig {
     /// Playback rate for the large-fruit merge sound (Peach, Pineapple).
     #[serde(default = "default_sfx_merge_large_pitch")]
     pub sfx_merge_large_pitch: f64,
+    /// Pitch increment added per combo count for the combo sound.
+    ///
+    /// Combo pitch = `1.0 + (combo_count × sfx_combo_pitch_step).min(sfx_combo_pitch_cap)`.
+    #[serde(default = "default_sfx_combo_pitch_step")]
+    pub sfx_combo_pitch_step: f64,
+    /// Maximum pitch offset added on top of 1.0 for the combo sound.
+    ///
+    /// Caps the value of `combo_count × sfx_combo_pitch_step` so the pitch
+    /// does not grow unboundedly at very high combo counts.
+    #[serde(default = "default_sfx_combo_pitch_cap")]
+    pub sfx_combo_pitch_cap: f64,
 }
 
 // Default values — these match the hard-coded constants that bgm.rs used
@@ -115,6 +126,10 @@ pub const DEFAULT_SFX_BUTTON_HOVER_VOLUME: f32 = 0.0;
 pub const DEFAULT_SFX_MERGE_SMALL_PITCH: f64 = 1.2;
 pub const DEFAULT_SFX_MERGE_MEDIUM_PITCH: f64 = 1.0;
 pub const DEFAULT_SFX_MERGE_LARGE_PITCH: f64 = 0.8;
+/// Pitch added per combo count (e.g. 0.1 → combo 2 = 1.2×, combo 5 = 1.5×).
+pub const DEFAULT_SFX_COMBO_PITCH_STEP: f64 = 0.1;
+/// Maximum pitch offset above 1.0 for the combo sound (caps the step scaling).
+pub const DEFAULT_SFX_COMBO_PITCH_CAP: f64 = 0.5;
 
 // serde requires function pointers for #[serde(default = "...")], so each
 // constant is exposed through a thin forwarding function.
@@ -172,6 +187,12 @@ fn default_sfx_merge_medium_pitch() -> f64 {
 fn default_sfx_merge_large_pitch() -> f64 {
     DEFAULT_SFX_MERGE_LARGE_PITCH
 }
+fn default_sfx_combo_pitch_step() -> f64 {
+    DEFAULT_SFX_COMBO_PITCH_STEP
+}
+fn default_sfx_combo_pitch_cap() -> f64 {
+    DEFAULT_SFX_COMBO_PITCH_CAP
+}
 
 impl Default for AudioConfig {
     fn default() -> Self {
@@ -194,6 +215,8 @@ impl Default for AudioConfig {
             sfx_merge_small_pitch: DEFAULT_SFX_MERGE_SMALL_PITCH,
             sfx_merge_medium_pitch: DEFAULT_SFX_MERGE_MEDIUM_PITCH,
             sfx_merge_large_pitch: DEFAULT_SFX_MERGE_LARGE_PITCH,
+            sfx_combo_pitch_step: DEFAULT_SFX_COMBO_PITCH_STEP,
+            sfx_combo_pitch_cap: DEFAULT_SFX_COMBO_PITCH_CAP,
         }
     }
 }
@@ -245,6 +268,20 @@ impl AssetLoader for AudioConfigLoader {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     format!("{name} must be > 0.0, got {pitch}"),
+                ));
+            }
+        }
+
+        // Combo pitch parameters must also be positive so the formula
+        // `1.0 + (count × step).min(cap)` always produces a pitch ≥ 1.0.
+        for (name, value) in [
+            ("sfx_combo_pitch_step", cfg.sfx_combo_pitch_step),
+            ("sfx_combo_pitch_cap", cfg.sfx_combo_pitch_cap),
+        ] {
+            if value <= 0.0 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("{name} must be > 0.0, got {value}"),
                 ));
             }
         }
@@ -407,6 +444,21 @@ AudioConfig(
         assert!(
             DEFAULT_SFX_MERGE_LARGE_PITCH > 0.0,
             "default large pitch must be > 0"
+        );
+    }
+
+    #[test]
+    fn test_combo_pitch_params_defaults_are_positive() {
+        // The loader rejects sfx_combo_pitch_step and sfx_combo_pitch_cap ≤ 0.
+        // Verify that the built-in defaults satisfy this constraint so a default
+        // AudioConfig is never rejected.
+        assert!(
+            DEFAULT_SFX_COMBO_PITCH_STEP > 0.0,
+            "default combo pitch step must be > 0"
+        );
+        assert!(
+            DEFAULT_SFX_COMBO_PITCH_CAP > 0.0,
+            "default combo pitch cap must be > 0"
         );
     }
 }
