@@ -6,7 +6,7 @@
 
 use bevy::prelude::*;
 
-use crate::config::{FlashConfig, FlashConfigHandle};
+use crate::config::FlashParams;
 use crate::events::FruitMergeEvent;
 
 // --- Constants ---
@@ -70,17 +70,13 @@ pub fn spawn_merge_flash(
     mut merge_events: MessageReader<FruitMergeEvent>,
     fruits_config_handle: Option<Res<crate::config::FruitsConfigHandle>>,
     fruits_config_assets: Option<Res<Assets<crate::config::FruitsConfig>>>,
-    flash_config_handle: Option<Res<FlashConfigHandle>>,
-    flash_config_assets: Option<Res<Assets<FlashConfig>>>,
+    flash: FlashParams<'_>,
 ) {
     let fruit_config = fruits_config_handle
         .as_ref()
         .zip(fruits_config_assets.as_ref())
         .and_then(|(h, a)| a.get(&h.0));
-    let flash_cfg = flash_config_handle
-        .as_ref()
-        .zip(flash_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let flash_cfg = flash.get();
 
     let local_duration = flash_cfg
         .map(|c| c.local_duration)
@@ -167,13 +163,9 @@ pub fn animate_local_flash(
         &mut Transform,
     )>,
     time: Res<Time>,
-    flash_config_handle: Option<Res<FlashConfigHandle>>,
-    flash_config_assets: Option<Res<Assets<FlashConfig>>>,
+    flash: FlashParams<'_>,
 ) {
-    let flash_cfg = flash_config_handle
-        .as_ref()
-        .zip(flash_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let flash_cfg = flash.get();
     let initial_alpha = flash_cfg
         .map(|c| c.local_initial_alpha)
         .unwrap_or(LOCAL_FLASH_INITIAL_ALPHA);
@@ -207,13 +199,9 @@ pub fn animate_screen_flash(
     mut commands: Commands,
     mut flashes: Query<(Entity, &mut ScreenFlashAnimation, &mut Sprite)>,
     time: Res<Time>,
-    flash_config_handle: Option<Res<FlashConfigHandle>>,
-    flash_config_assets: Option<Res<Assets<FlashConfig>>>,
+    flash: FlashParams<'_>,
 ) {
-    let flash_cfg = flash_config_handle
-        .as_ref()
-        .zip(flash_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let flash_cfg = flash.get();
     let initial_alpha = flash_cfg
         .map(|c| c.screen_initial_alpha)
         .unwrap_or(SCREEN_FLASH_INITIAL_ALPHA);

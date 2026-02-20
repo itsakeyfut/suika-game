@@ -6,30 +6,11 @@
 
 use bevy::prelude::*;
 use rand::RngExt;
-use serde::Deserialize;
 
 use crate::components::{Fruit, FruitSpawnState};
-use crate::config::{
-    BounceConfig, BounceConfigHandle, DropletConfig, DropletConfigHandle, PhysicsConfig,
-    PhysicsConfigHandle,
-};
+use crate::config::{BounceParams, DropletColorMode, DropletConfig, DropletParams, PhysicsParams};
 use crate::events::FruitMergeEvent;
 use crate::systems::effects::bounce::SquashStretchAnimation;
-
-// --- Color Mode ---
-
-/// Controls how water droplet color is determined
-///
-/// - `Water`: all droplets use the fixed base color (a blue-ish water tone)
-/// - `Juice`: droplets inherit the color of the fruit that triggered them
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DropletColorMode {
-    /// Use the fixed water color defined in `DropletConfig.color`
-    #[default]
-    Water,
-    /// Use the triggering fruit's placeholder color
-    Juice,
-}
 
 // --- Constants ---
 
@@ -161,13 +142,9 @@ fn spawn_droplets(
 pub fn spawn_merge_droplets(
     mut commands: Commands,
     mut merge_events: MessageReader<FruitMergeEvent>,
-    droplet_config_handle: Option<Res<DropletConfigHandle>>,
-    droplet_config_assets: Option<Res<Assets<DropletConfig>>>,
+    droplet: DropletParams<'_>,
 ) {
-    let config = droplet_config_handle
-        .as_ref()
-        .zip(droplet_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let config = droplet.get();
     let count = config.map(|c| c.count_merge).unwrap_or(DROPLET_COUNT_MERGE);
 
     for event in merge_events.read() {
@@ -195,19 +172,11 @@ pub fn handle_fruit_landing(
         ),
         (With<Fruit>, Changed<FruitSpawnState>),
     >,
-    droplet_config_handle: Option<Res<DropletConfigHandle>>,
-    droplet_config_assets: Option<Res<Assets<DropletConfig>>>,
-    bounce_config_handle: Option<Res<BounceConfigHandle>>,
-    bounce_config_assets: Option<Res<Assets<BounceConfig>>>,
+    droplet: DropletParams<'_>,
+    bounce: BounceParams<'_>,
 ) {
-    let droplet_cfg = droplet_config_handle
-        .as_ref()
-        .zip(droplet_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
-    let bounce_cfg = bounce_config_handle
-        .as_ref()
-        .zip(bounce_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let droplet_cfg = droplet.get();
+    let bounce_cfg = bounce.get();
 
     let count = droplet_cfg
         .map(|c| c.count_landing)
@@ -241,24 +210,17 @@ pub fn update_water_droplets(
     mut commands: Commands,
     mut droplets: Query<(Entity, &mut WaterDroplet, &mut Transform, &mut Sprite)>,
     time: Res<Time>,
-    physics_config_handle: Option<Res<PhysicsConfigHandle>>,
-    physics_config_assets: Option<Res<Assets<PhysicsConfig>>>,
-    droplet_config_handle: Option<Res<DropletConfigHandle>>,
-    droplet_config_assets: Option<Res<Assets<DropletConfig>>>,
+    physics: PhysicsParams<'_>,
+    droplet: DropletParams<'_>,
 ) {
     let dt = time.delta_secs();
 
-    let (half_w, half_h) = physics_config_handle
-        .as_ref()
-        .zip(physics_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0))
+    let (half_w, half_h) = physics
+        .get()
         .map(|cfg| (cfg.container_width / 2.0, cfg.container_height / 2.0))
         .unwrap_or((300.0, 400.0));
 
-    let droplet_cfg = droplet_config_handle
-        .as_ref()
-        .zip(droplet_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let droplet_cfg = droplet.get();
     let gravity = droplet_cfg.map(|c| c.gravity).unwrap_or(DROPLET_GRAVITY);
     let bounce_damping = droplet_cfg
         .map(|c| c.bounce_damping)

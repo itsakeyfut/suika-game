@@ -17,7 +17,7 @@
 use bevy::prelude::*;
 use rand::RngExt;
 
-use crate::config::{ShakeConfig, ShakeConfigHandle};
+use crate::config::ShakeParams;
 use crate::events::FruitMergeEvent;
 
 // ---------------------------------------------------------------------------
@@ -77,13 +77,9 @@ impl CameraShake {
 pub fn add_camera_shake(
     mut merge_events: MessageReader<FruitMergeEvent>,
     mut shake_query: Query<&mut CameraShake>,
-    shake_config_handle: Option<Res<ShakeConfigHandle>>,
-    shake_config_assets: Option<Res<Assets<ShakeConfig>>>,
+    shake: ShakeParams<'_>,
 ) {
-    let cfg = shake_config_handle
-        .as_ref()
-        .zip(shake_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let cfg = shake.get();
 
     let min_index = cfg
         .map(|c| c.min_fruit_index)
@@ -122,17 +118,13 @@ pub fn add_camera_shake(
 pub fn apply_camera_shake(
     mut query: Query<(&mut Transform, &mut CameraShake), With<Camera2d>>,
     time: Res<Time>,
-    shake_config_handle: Option<Res<ShakeConfigHandle>>,
-    shake_config_assets: Option<Res<Assets<ShakeConfig>>>,
+    shake: ShakeParams<'_>,
 ) {
-    let Ok((mut transform, mut shake)) = query.single_mut() else {
+    let Ok((mut transform, mut shake_state)) = query.single_mut() else {
         return;
     };
 
-    let cfg = shake_config_handle
-        .as_ref()
-        .zip(shake_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let cfg = shake.get();
 
     let decay = cfg.map(|c| c.decay).unwrap_or(DEFAULT_SHAKE_DECAY);
     let max_offset = cfg
@@ -140,11 +132,11 @@ pub fn apply_camera_shake(
         .unwrap_or(DEFAULT_SHAKE_MAX_OFFSET);
 
     // Decay trauma each frame regardless of state
-    if shake.trauma > 0.0 {
-        shake.trauma = (shake.trauma - decay * time.delta_secs()).max(0.0);
+    if shake_state.trauma > 0.0 {
+        shake_state.trauma = (shake_state.trauma - decay * time.delta_secs()).max(0.0);
     }
 
-    let shake_amount = shake.trauma * shake.trauma;
+    let shake_amount = shake_state.trauma * shake_state.trauma;
 
     if shake_amount < 0.001 {
         // Snap camera back to world origin
