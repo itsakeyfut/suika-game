@@ -15,8 +15,10 @@
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 use suika_game_core::prelude::GameState;
+use suika_game_core::resources::settings::Language;
 
 use crate::config::{ScoreHudConfig, ScoreHudConfigHandle};
+use crate::i18n::t;
 use crate::screens::title::format_score;
 use crate::styles::{BG_COLOR, FONT_SIZE_MEDIUM, FONT_SIZE_SMALL, PRIMARY_COLOR, TEXT_COLOR};
 
@@ -74,6 +76,7 @@ pub fn spawn_score_widget(
     parent: &mut ChildSpawnerCommands,
     font: &Handle<Font>,
     cfg: &ScoreHudConfig,
+    lang: Language,
 ) {
     parent
         .spawn((
@@ -90,7 +93,7 @@ pub fn spawn_score_widget(
         ))
         .with_children(|panel| {
             panel.spawn((
-                Text::new("スコア"),
+                Text::new(t("hud_score", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_SMALL,

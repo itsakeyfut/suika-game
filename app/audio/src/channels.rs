@@ -64,6 +64,35 @@ pub fn volume_to_db(vol: u8) -> f32 {
 }
 
 // ---------------------------------------------------------------------------
+// Resources
+// ---------------------------------------------------------------------------
+
+/// Tracks the volume values that were last written to the audio channels.
+///
+/// Because [`apply_volume_settings`] runs whenever **any** field in
+/// [`SettingsResource`] changes (including language or effects toggles),
+/// this resource lets the system skip the `set_volume` call when only
+/// non-volume fields were mutated, preventing unexpected BGM level jumps.
+///
+/// Initialised with sentinel values (`u8::MAX`) so the very first run
+/// always writes the correct volume to the channels regardless of the
+/// saved settings.
+#[derive(Resource)]
+pub struct PreviousVolume {
+    pub bgm: u8,
+    pub sfx: u8,
+}
+
+impl Default for PreviousVolume {
+    fn default() -> Self {
+        Self {
+            bgm: u8::MAX,
+            sfx: u8::MAX,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // System
 // ---------------------------------------------------------------------------
 
@@ -72,13 +101,23 @@ pub fn volume_to_db(vol: u8) -> f32 {
 /// Schedule this with `.run_if(resource_changed::<SettingsResource>())` so it
 /// runs on the first frame (when the resource is first inserted / loaded from
 /// disk) **and** whenever the user adjusts a slider in the settings screen.
+///
+/// Uses [`PreviousVolume`] to guard against spurious `set_volume` calls when
+/// language or effects fields change without touching the volume values.
 pub fn apply_volume_settings(
     settings: Res<SettingsResource>,
     bgm_channel: Res<AudioChannel<BgmChannel>>,
     sfx_channel: Res<AudioChannel<SfxChannel>>,
+    mut prev: ResMut<PreviousVolume>,
 ) {
-    bgm_channel.set_volume(volume_to_db(settings.bgm_volume));
-    sfx_channel.set_volume(volume_to_db(settings.sfx_volume));
+    if settings.bgm_volume != prev.bgm {
+        bgm_channel.set_volume(volume_to_db(settings.bgm_volume));
+        prev.bgm = settings.bgm_volume;
+    }
+    if settings.sfx_volume != prev.sfx {
+        sfx_channel.set_volume(volume_to_db(settings.sfx_volume));
+        prev.sfx = settings.sfx_volume;
+    }
 }
 
 // ---------------------------------------------------------------------------

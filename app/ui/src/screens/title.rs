@@ -54,7 +54,7 @@ pub fn setup_title_screen(
         .with_children(|parent| {
             // Game title
             parent.spawn((
-                Text::new("スイカゲーム"),
+                Text::new(t("game_title", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_HUGE,

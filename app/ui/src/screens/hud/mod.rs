@@ -36,7 +36,7 @@ pub mod score;
 pub mod score_popup;
 
 use bevy::prelude::*;
-use suika_game_core::prelude::AppState;
+use suika_game_core::prelude::{AppState, SettingsResource};
 
 use crate::config::{
     BestScoreHudConfig, BestScoreHudConfigHandle, HudLayoutConfig, HudLayoutConfigHandle,
@@ -74,6 +74,7 @@ pub struct HudNextAnchor;
 pub fn setup_hud(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    settings: Res<SettingsResource>,
     layout_handle: Res<HudLayoutConfigHandle>,
     layout_assets: Res<Assets<HudLayoutConfig>>,
     score_handle: Res<ScoreHudConfigHandle>,
@@ -84,6 +85,7 @@ pub fn setup_hud(
     next_assets: Res<Assets<NextHudConfig>>,
 ) {
     let font: Handle<Font> = asset_server.load(FONT_JP);
+    let lang = settings.language;
 
     let default_layout = HudLayoutConfig::default();
     let default_score = ScoreHudConfig::default();
@@ -124,7 +126,7 @@ pub fn setup_hud(
                 HudBestScoreAnchor,
             ))
             .with_children(|anchor| {
-                best_score::spawn_best_score_widget(anchor, &font, best_score_cfg);
+                best_score::spawn_best_score_widget(anchor, &font, best_score_cfg, lang);
             });
 
             // ------------------------------------------------------------------
@@ -140,7 +142,7 @@ pub fn setup_hud(
                 HudScoreAnchor,
             ))
             .with_children(|anchor| {
-                score::spawn_score_widget(anchor, &font, score_cfg);
+                score::spawn_score_widget(anchor, &font, score_cfg, lang);
             });
 
             // ------------------------------------------------------------------
@@ -156,7 +158,7 @@ pub fn setup_hud(
                 HudNextAnchor,
             ))
             .with_children(|anchor| {
-                next::spawn_next_widget(anchor, &font, next_cfg);
+                next::spawn_next_widget(anchor, &font, next_cfg, lang);
             });
         });
 }

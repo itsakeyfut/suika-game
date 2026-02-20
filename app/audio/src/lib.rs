@@ -53,6 +53,7 @@ impl Plugin for GameAudioPlugin {
             .register_asset_loader(config::AudioConfigLoader)
             // Resources
             .init_resource::<bgm::CurrentBgm>()
+            .init_resource::<channels::PreviousVolume>()
             // Startup systems
             .add_systems(
                 Startup,

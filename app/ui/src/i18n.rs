@@ -23,7 +23,7 @@ pub fn t(key: &'static str, lang: Language) -> &'static str {
         ("btn_settings", Language::Japanese) => "設定",
         ("btn_settings", Language::English) => "Settings",
         ("btn_how_to_play", Language::Japanese) => "遊び方",
-        ("btn_how_to_play", Language::English) => "How to Play",
+        ("btn_how_to_play", Language::English) => "Guide",
         ("highscore", Language::Japanese) => "ハイスコア",
         ("highscore", Language::English) => "Best Score",
 
@@ -94,6 +94,14 @@ pub fn t(key: &'static str, lang: Language) -> &'static str {
         ("elapsed_time", Language::English) => "Play Time",
         ("btn_retry", Language::Japanese) => "もう一度",
         ("btn_retry", Language::English) => "Retry",
+
+        // ── HUD (in-game overlay) ─────────────────────────────────────────
+        ("hud_best_score", Language::Japanese) => "ベストスコア",
+        ("hud_best_score", Language::English) => "Best Score",
+        ("hud_score", Language::Japanese) => "スコア",
+        ("hud_score", Language::English) => "Score",
+        ("hud_next", Language::Japanese) => "ネクスト",
+        ("hud_next", Language::English) => "Next",
 
         // ── Fallback ──────────────────────────────────────────────────────
         _ => key,

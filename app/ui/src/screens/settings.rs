@@ -7,13 +7,17 @@
 //!
 //!  BGM音量    ◀  ■■■■■■■■□□  ▶   80%
 //!  SE音量     ◀  ■■■■■■■■□□  ▶   80%
-//!  エフェクト  ◀  [  ON  ]    ▶
+//!  エフェクト  [         ON        ]
 //!  言語        ◀  [ 日本語 ]   ▶
 //!
 //!           [ もどる ]
 //! ```
 //!
-//! Pressing ◀ / ▶ immediately mutates [`SettingsResource`] and persists the
+//! Volume rows use ◀ / ▶ arrow buttons to step the value up or down.
+//! The effects row uses a single wide toggle button that cycles ON ↔ OFF.
+//! The language row uses ◀ / ▶ to cycle through available languages.
+//!
+//! Every button press immediately mutates [`SettingsResource`] and persists the
 //! change to `save/settings.json`.  [`update_settings_display`] runs every
 //! frame while in this state and updates the value text nodes whenever the
 //! resource is marked changed.
@@ -40,8 +44,24 @@ const LABEL_WIDTH: f32 = 160.0;
 const GAUGE_WIDTH: f32 = 240.0;
 const SMALL_BTN_SIZE: f32 = 48.0;
 const ROW_GAP: f32 = 20.0;
-/// Width of a boolean toggle button — matches the combined width of ◀ + value + ▶.
-const TOGGLE_BTN_WIDTH: f32 = GAUGE_WIDTH + SMALL_BTN_SIZE * 2.0;
+/// Column gap between items within a row (label ↔ ◀ ↔ gauge ↔ ▶).
+const COL_GAP: f32 = 12.0;
+/// Button margin applied on all sides by [`spawn_button`] / [`spawn_arrow_button`].
+const BTN_MARGIN: f32 = 10.0;
+/// Total width of every settings row so the outer column can centre them consistently.
+///
+/// Computed as:
+/// `LABEL_WIDTH + COL_GAP + (SMALL_BTN_SIZE + 2×BTN_MARGIN) + COL_GAP + GAUGE_WIDTH + COL_GAP + (SMALL_BTN_SIZE + 2×BTN_MARGIN)`
+const ROW_WIDTH: f32 = LABEL_WIDTH
+    + COL_GAP
+    + (SMALL_BTN_SIZE + BTN_MARGIN * 2.0)
+    + COL_GAP
+    + GAUGE_WIDTH
+    + COL_GAP
+    + (SMALL_BTN_SIZE + BTN_MARGIN * 2.0);
+/// Width of a boolean toggle button so it occupies the same horizontal space
+/// as the ◀ + value-text + ▶ triplet in a setting row.
+const TOGGLE_BTN_WIDTH: f32 = ROW_WIDTH - LABEL_WIDTH - COL_GAP - BTN_MARGIN * 2.0;
 
 // ---------------------------------------------------------------------------
 // Marker components (local — not exported)
@@ -133,8 +153,9 @@ fn spawn_setting_row<M: Component>(
         .spawn(Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
+            width: Val::Px(ROW_WIDTH),
             margin: UiRect::vertical(Val::Px(ROW_GAP / 2.0)),
-            column_gap: Val::Px(12.0),
+            column_gap: Val::Px(COL_GAP),
             ..default()
         })
         .with_children(|row| {
@@ -200,8 +221,9 @@ fn spawn_toggle_row<M: Component>(
         .spawn(Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
+            width: Val::Px(ROW_WIDTH),
             margin: UiRect::vertical(Val::Px(ROW_GAP / 2.0)),
-            column_gap: Val::Px(12.0),
+            column_gap: Val::Px(COL_GAP),
             ..default()
         })
         .with_children(|row| {
@@ -227,7 +249,7 @@ fn spawn_toggle_row<M: Component>(
                 Node {
                     width: Val::Px(TOGGLE_BTN_WIDTH),
                     height: Val::Px(SMALL_BTN_SIZE),
-                    margin: UiRect::all(Val::Px(10.0)),
+                    margin: UiRect::all(Val::Px(BTN_MARGIN)),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     ..default()

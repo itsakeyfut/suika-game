@@ -14,8 +14,10 @@
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 use suika_game_core::prelude::GameState;
+use suika_game_core::resources::settings::Language;
 
 use crate::config::BestScoreHudConfig;
+use crate::i18n::t;
 use crate::screens::title::format_score;
 use crate::styles::{BG_COLOR, FONT_SIZE_MEDIUM, FONT_SIZE_SMALL, PRIMARY_COLOR, TEXT_COLOR};
 
@@ -52,6 +54,7 @@ pub fn spawn_best_score_widget(
     parent: &mut ChildSpawnerCommands,
     font: &Handle<Font>,
     cfg: &BestScoreHudConfig,
+    lang: Language,
 ) {
     parent
         .spawn((
@@ -68,7 +71,7 @@ pub fn spawn_best_score_widget(
         ))
         .with_children(|panel| {
             panel.spawn((
-                Text::new("ベストスコア"),
+                Text::new(t("hud_best_score", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_SMALL,
