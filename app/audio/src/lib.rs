@@ -60,6 +60,8 @@ impl Plugin for GameAudioPlugin {
                     config::hot_reload_audio_config,
                     sfx::play_merge_sfx,
                     sfx::play_combo_sfx,
+                    sfx::play_ui_sfx,
+                    sfx::play_keyboard_ui_sfx,
                 ),
             )
             // One-shot systems triggered by state transitions
