@@ -203,6 +203,12 @@ mod tests {
             MergeSfxCategory::from_fruit(FruitType::Melon),
             MergeSfxCategory::Watermelon
         ));
+        // Watermelon itself is also handled defensively (cannot appear in a
+        // real FruitMergeEvent, but the match arm covers it explicitly).
+        assert!(matches!(
+            MergeSfxCategory::from_fruit(FruitType::Watermelon),
+            MergeSfxCategory::Watermelon
+        ));
     }
 
     #[test]

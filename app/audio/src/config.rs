@@ -341,6 +341,7 @@ AudioConfig(
     sfx_gameover_volume: -2.0,
     sfx_button_click_volume: -5.0,
     sfx_button_hover_volume: -8.0,
+    sfx_merge_small_pitch: 1.1,
 )
 "#;
         let cfg: AudioConfig = ron::de::from_str(ron_str).expect("RON parse must succeed");
@@ -348,6 +349,11 @@ AudioConfig(
         assert_eq!(cfg.bgm_game_volume, -6.0);
         assert_eq!(cfg.bgm_fade_out_secs, 0.8);
         assert_eq!(cfg.sfx_watermelon_volume, 3.0);
+        // Explicitly set pitch field is parsed correctly.
+        assert_eq!(cfg.sfx_merge_small_pitch, 1.1);
+        // Omitted pitch fields fall back to serde defaults.
+        assert_eq!(cfg.sfx_merge_medium_pitch, DEFAULT_SFX_MERGE_MEDIUM_PITCH);
+        assert_eq!(cfg.sfx_merge_large_pitch, DEFAULT_SFX_MERGE_LARGE_PITCH);
     }
 
     #[test]
