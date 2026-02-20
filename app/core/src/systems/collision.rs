@@ -48,7 +48,10 @@ pub struct ProcessedCollisions {
 ///
 /// Entity pairs are normalized (min entity, max entity) and tracked in
 /// `ProcessedCollisions` to prevent duplicate events within a single frame.
-/// Fruits already marked as `MergeCandidate` are skipped.
+/// A frame-local `HashSet<Entity>` additionally ensures that a single entity
+/// cannot be claimed by two different merge pairs in the same frame (which
+/// would cause double scoring). Fruits already marked as `MergeCandidate`
+/// are skipped.
 ///
 /// # Conditions for a merge
 ///
@@ -69,6 +72,14 @@ pub fn detect_fruit_contact(
     let Ok(ctx) = rapier_context.single() else {
         return;
     };
+
+    // Tracks individual entities already claimed for a merge this frame.
+    // MergeCandidate is inserted via deferred Commands, so Without<MergeCandidate>
+    // won't filter out a just-claimed entity until the next command flush.
+    // This local set prevents a single entity from appearing in two merge pairs
+    // (e.g. A-B and A-C) within one detect_fruit_contact run, which would
+    // otherwise cause double scoring.
+    let mut claimed: HashSet<Entity> = HashSet::new();
 
     for contact_pair in ctx
         .simulation
@@ -95,6 +106,11 @@ pub fn detect_fruit_contact(
             continue;
         }
 
+        // Skip entities already claimed for a merge this frame
+        if claimed.contains(&entity1) || claimed.contains(&entity2) {
+            continue;
+        }
+
         // Check both entities are fruits not already merging
         let Ok((type1, state1)) = fruit_query.get(entity1) else {
             continue;
@@ -116,14 +132,20 @@ pub fn detect_fruit_contact(
         let fruit_type = *type1;
 
         // Calculate merge position as midpoint between the two fruits
-        let pos1 = transform_query
-            .get(entity1)
-            .map(|t| t.translation.truncate())
-            .unwrap_or(Vec2::ZERO);
-        let pos2 = transform_query
-            .get(entity2)
-            .map(|t| t.translation.truncate())
-            .unwrap_or(Vec2::ZERO);
+        let pos1 = match transform_query.get(entity1) {
+            Ok(t) => t.translation.truncate(),
+            Err(_) => {
+                warn!("detect_fruit_contact: entity1 {:?} has no Transform", entity1);
+                Vec2::ZERO
+            }
+        };
+        let pos2 = match transform_query.get(entity2) {
+            Ok(t) => t.translation.truncate(),
+            Err(_) => {
+                warn!("detect_fruit_contact: entity2 {:?} has no Transform", entity2);
+                Vec2::ZERO
+            }
+        };
         let position = (pos1 + pos2) / 2.0;
 
         // Mark both fruits as merge candidates to prevent further collision processing
@@ -131,6 +153,8 @@ pub fn detect_fruit_contact(
         commands.entity(entity2).insert(MergeCandidate);
 
         processed.pairs.insert(pair);
+        claimed.insert(entity1);
+        claimed.insert(entity2);
 
         merge_events.write(FruitMergeEvent {
             entity1,
