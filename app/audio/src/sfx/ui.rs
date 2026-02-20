@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use suika_game_ui::components::{KeyboardFocusIndex, MenuButton};
 
+use crate::channels::SfxChannel;
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::SfxHandles;
 
@@ -16,7 +17,7 @@ use crate::handles::SfxHandles;
 /// - [`Interaction::Pressed`] → `button_click.wav`
 pub fn play_ui_sfx(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MenuButton>)>,
-    audio: Res<Audio>,
+    sfx_channel: Res<AudioChannel<SfxChannel>>,
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
@@ -34,12 +35,12 @@ pub fn play_ui_sfx(
     for interaction in interaction_query.iter() {
         match *interaction {
             Interaction::Pressed => {
-                audio
+                sfx_channel
                     .play(sfx_handles.button_click.clone())
                     .with_volume(cfg.sfx_button_click_volume);
             }
             Interaction::Hovered => {
-                audio
+                sfx_channel
                     .play(sfx_handles.button_hover.clone())
                     .with_volume(cfg.sfx_button_hover_volume);
             }
@@ -63,7 +64,7 @@ pub fn play_keyboard_ui_sfx(
     button_query: Query<(), With<MenuButton>>,
     focus: Option<Res<KeyboardFocusIndex>>,
     mut prev_focus: Local<Option<usize>>,
-    audio: Res<Audio>,
+    sfx_channel: Res<AudioChannel<SfxChannel>>,
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
@@ -90,14 +91,14 @@ pub fn play_keyboard_ui_sfx(
     // Hover sound: only when the focus index actually moved.
     let old = prev_focus.replace(current);
     if old.is_some_and(|p| p != current) {
-        audio
+        sfx_channel
             .play(sfx_handles.button_hover.clone())
             .with_volume(cfg.sfx_button_hover_volume);
     }
 
     // Confirm key → click sound.
     if keyboard.just_pressed(KeyCode::Enter) {
-        audio
+        sfx_channel
             .play(sfx_handles.button_click.clone())
             .with_volume(cfg.sfx_button_click_volume);
     }

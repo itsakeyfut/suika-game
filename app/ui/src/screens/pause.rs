@@ -17,9 +17,10 @@
 //! tionally in [`GameUIPlugin`] so the same system handles both directions.
 
 use bevy::prelude::*;
-use suika_game_core::prelude::AppState;
+use suika_game_core::prelude::{AppState, SettingsResource};
 
 use crate::components::{ButtonAction, KeyboardFocusIndex, spawn_button};
+use crate::i18n::t;
 use crate::styles::{
     BUTTON_LARGE_HEIGHT, BUTTON_LARGE_WIDTH, BUTTON_MEDIUM_HEIGHT, BUTTON_MEDIUM_WIDTH, FONT_JP,
     FONT_SIZE_LARGE, FONT_SIZE_MEDIUM,
@@ -46,12 +47,14 @@ const PAUSED_TEXT_COLOR: Color = Color::WHITE;
 /// so the Resume button always receives initial keyboard focus.
 pub fn setup_pause_menu(
     mut commands: Commands,
+    settings: Res<SettingsResource>,
     asset_server: Res<AssetServer>,
     mut keyboard_focus: ResMut<KeyboardFocusIndex>,
 ) {
     keyboard_focus.0 = 0;
 
     let font: Handle<Font> = asset_server.load(FONT_JP);
+    let lang = settings.language;
 
     commands
         .spawn((
@@ -68,9 +71,9 @@ pub fn setup_pause_menu(
             DespawnOnExit(AppState::Paused),
         ))
         .with_children(|parent| {
-            // "PAUSED" heading
+            // Pause heading
             parent.spawn((
-                Text::new("PAUSED"),
+                Text::new(t("pause_title", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_LARGE,
@@ -86,7 +89,7 @@ pub fn setup_pause_menu(
             // Resume button (index 0 — initial keyboard focus)
             spawn_button(
                 parent,
-                "再開",
+                t("btn_resume", lang),
                 ButtonAction::ResumeGame,
                 0,
                 FONT_SIZE_LARGE,
@@ -98,7 +101,7 @@ pub fn setup_pause_menu(
             // Back-to-title button (index 1)
             spawn_button(
                 parent,
-                "タイトルへ",
+                t("btn_title", lang),
                 ButtonAction::GoToTitle,
                 1,
                 FONT_SIZE_MEDIUM,

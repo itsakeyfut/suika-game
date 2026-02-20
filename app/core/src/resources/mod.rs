@@ -2,16 +2,18 @@
 //!
 //! This module defines Bevy resources for managing game state,
 //! including score tracking, combo system, game over detection,
-//! and next fruit preview.
+//! next fruit preview, and user settings.
 
 pub mod combo;
 pub mod game;
 pub mod game_over;
+pub mod settings;
 pub mod spawn;
 
 pub use combo::ComboTimer;
 pub use game::GameState;
 pub use game_over::GameOverTimer;
+pub use settings::{Language, SettingsResource};
 pub use spawn::NextFruitType;
 
 #[cfg(test)]

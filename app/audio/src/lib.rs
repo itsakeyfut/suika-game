@@ -14,10 +14,11 @@
 //! | `sfx`     | SFX playback (merge, combo, UI, game-over) |
 
 use bevy::prelude::*;
-use bevy_kira_audio::AudioPlugin as KiraAudioPlugin;
-use suika_game_core::prelude::AppState;
+use bevy_kira_audio::{AudioApp, AudioPlugin as KiraAudioPlugin};
+use suika_game_core::prelude::{AppState, SettingsResource};
 
 pub mod bgm;
+pub mod channels;
 pub mod config;
 pub mod handles;
 pub mod sfx;
@@ -42,11 +43,17 @@ impl Plugin for GameAudioPlugin {
         // Add the kira audio backend.  All other audio plugins/systems rely on
         // this being registered first.
         app.add_plugins(KiraAudioPlugin)
+            // Typed audio channels — BGM bus and SFX bus.
+            // User volume (from SettingsResource) is applied to these channels;
+            // individual sound volumes remain the designer's RON-defined levels.
+            .add_audio_channel::<channels::BgmChannel>()
+            .add_audio_channel::<channels::SfxChannel>()
             // Audio config asset type + loader
             .init_asset::<config::AudioConfig>()
             .register_asset_loader(config::AudioConfigLoader)
             // Resources
             .init_resource::<bgm::CurrentBgm>()
+            .init_resource::<channels::PreviousVolume>()
             // Startup systems
             .add_systems(
                 Startup,
@@ -56,6 +63,9 @@ impl Plugin for GameAudioPlugin {
             .add_systems(
                 Update,
                 (
+                    // Apply user volume to channels whenever settings change
+                    // (also fires on the first frame after SettingsResource loads).
+                    channels::apply_volume_settings.run_if(resource_changed::<SettingsResource>),
                     bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
                     config::hot_reload_audio_config,
                     sfx::play_merge_sfx,

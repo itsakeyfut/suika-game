@@ -79,6 +79,13 @@ pub const BUTTON_MEDIUM_HEIGHT: f32 = 60.0;
 /// Relative to the `assets/` directory; pass to [`AssetServer::load`].
 pub const FONT_JP: &str = "fonts/DotGothic16/DotGothic16-Regular.ttf";
 
+/// Path to the symbol / UI-icon font (Noto Sans JP).
+///
+/// Used for characters outside DotGothic16's coverage, such as the
+/// ◀ / ▶ navigation arrows on the settings screen.
+/// Relative to the `assets/` directory; pass to [`AssetServer::load`].
+pub const FONT_SYMBOL: &str = "fonts/NotoSansJP/NotoSansJP-Regular.ttf";
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

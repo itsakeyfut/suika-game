@@ -14,9 +14,10 @@
 //! `GameOver`.
 
 use bevy::prelude::*;
-use suika_game_core::prelude::{AppState, GameState};
+use suika_game_core::prelude::{AppState, GameState, SettingsResource};
 
 use crate::components::{ButtonAction, KeyboardFocusIndex, spawn_button};
+use crate::i18n::t;
 use crate::screens::hud::format_elapsed;
 use crate::styles::{
     BG_COLOR, BUTTON_LARGE_HEIGHT, BUTTON_LARGE_WIDTH, BUTTON_MEDIUM_HEIGHT, BUTTON_MEDIUM_WIDTH,
@@ -48,12 +49,14 @@ const GAME_OVER_COLOR: Color = Color::srgb(0.8, 0.2, 0.2);
 pub fn setup_game_over_screen(
     mut commands: Commands,
     game_state: Res<GameState>,
+    settings: Res<SettingsResource>,
     asset_server: Res<AssetServer>,
     mut keyboard_focus: ResMut<KeyboardFocusIndex>,
 ) {
     keyboard_focus.0 = 0;
 
     let font: Handle<Font> = asset_server.load(FONT_JP);
+    let lang = settings.language;
     let is_new_record = game_state.is_new_record;
 
     commands
@@ -70,9 +73,9 @@ pub fn setup_game_over_screen(
             DespawnOnExit(AppState::GameOver),
         ))
         .with_children(|parent| {
-            // "GAME OVER" heading
+            // Game-over heading
             parent.spawn((
-                Text::new("GAME OVER"),
+                Text::new(t("game_over_title", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_HUGE,
@@ -87,7 +90,11 @@ pub fn setup_game_over_screen(
 
             // Final score
             parent.spawn((
-                Text::new(format!("スコア: {}", format_score(game_state.score))),
+                Text::new(format!(
+                    "{}: {}",
+                    t("score", lang),
+                    format_score(game_state.score)
+                )),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_LARGE,
@@ -103,7 +110,7 @@ pub fn setup_game_over_screen(
             // NEW RECORD banner (only when the highscore was beaten)
             if is_new_record {
                 parent.spawn((
-                    Text::new("NEW RECORD!"),
+                    Text::new(t("new_record", lang)),
                     TextFont {
                         font: font.clone(),
                         font_size: FONT_SIZE_MEDIUM,
@@ -120,7 +127,8 @@ pub fn setup_game_over_screen(
             // All-time highscore
             parent.spawn((
                 Text::new(format!(
-                    "ハイスコア: {}",
+                    "{}: {}",
+                    t("highscore", lang),
                     format_score(game_state.highscore)
                 )),
                 TextFont {
@@ -138,7 +146,8 @@ pub fn setup_game_over_screen(
             // Elapsed time for this run
             parent.spawn((
                 Text::new(format!(
-                    "プレイ時間: {}",
+                    "{}: {}",
+                    t("elapsed_time", lang),
                     format_elapsed(game_state.elapsed_time as u32)
                 )),
                 TextFont {
@@ -156,7 +165,7 @@ pub fn setup_game_over_screen(
             // Retry button (index 0 — initial keyboard focus)
             spawn_button(
                 parent,
-                "もう一度",
+                t("btn_retry", lang),
                 ButtonAction::RetryGame,
                 0,
                 FONT_SIZE_LARGE,
@@ -168,7 +177,7 @@ pub fn setup_game_over_screen(
             // Go-to-title button (index 1)
             spawn_button(
                 parent,
-                "タイトルへ",
+                t("btn_title", lang),
                 ButtonAction::GoToTitle,
                 1,
                 FONT_SIZE_MEDIUM,

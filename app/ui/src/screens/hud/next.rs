@@ -18,8 +18,10 @@
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 use suika_game_core::prelude::{Fruit, FruitSpawnState, NextFruitType};
+use suika_game_core::resources::settings::Language;
 
 use crate::config::NextHudConfig;
+use crate::i18n::t;
 use crate::styles::{FONT_SIZE_SMALL, TEXT_COLOR};
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,7 @@ pub fn spawn_next_widget(
     parent: &mut ChildSpawnerCommands,
     font: &Handle<Font>,
     cfg: &NextHudConfig,
+    lang: Language,
 ) {
     parent
         .spawn(Node {
@@ -61,7 +64,7 @@ pub fn spawn_next_widget(
         .with_children(|col| {
             // Label
             col.spawn((
-                Text::new("ネクスト"),
+                Text::new(t("hud_next", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_SMALL,

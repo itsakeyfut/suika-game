@@ -2,16 +2,17 @@
 //!
 //! Spawns a full-screen layout containing:
 //! - The game title at the top center
-//! - A **Start** button and a **Settings** button in the middle
+//! - **Start**, **Settings**, **How to Play**, and **Quit** buttons
 //! - The all-time highscore at the bottom
 //!
 //! All entities are tagged with [`DespawnOnExit`]`(AppState::Title)` so Bevy
 //! automatically despawns them when the state transitions away from `Title`.
 
 use bevy::prelude::*;
-use suika_game_core::prelude::{AppState, GameState};
+use suika_game_core::prelude::{AppState, GameState, SettingsResource};
 
 use crate::components::{ButtonAction, KeyboardFocusIndex, spawn_button};
+use crate::i18n::t;
 use crate::styles::{
     BG_COLOR, BUTTON_LARGE_HEIGHT, BUTTON_LARGE_WIDTH, FONT_JP, FONT_SIZE_HUGE, FONT_SIZE_LARGE,
     FONT_SIZE_SMALL, PRIMARY_COLOR, TEXT_COLOR,
@@ -28,12 +29,14 @@ use crate::styles::{
 pub fn setup_title_screen(
     mut commands: Commands,
     game_state: Res<GameState>,
+    settings: Res<SettingsResource>,
     asset_server: Res<AssetServer>,
     mut keyboard_focus: ResMut<KeyboardFocusIndex>,
 ) {
     keyboard_focus.0 = 0;
 
     let font: Handle<Font> = asset_server.load(FONT_JP);
+    let lang = settings.language;
 
     commands
         .spawn((
@@ -51,7 +54,7 @@ pub fn setup_title_screen(
         .with_children(|parent| {
             // Game title
             parent.spawn((
-                Text::new("スイカゲーム"),
+                Text::new(t("game_title", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_HUGE,
@@ -67,7 +70,7 @@ pub fn setup_title_screen(
             // Start button (index 0 — receives initial BUTTON_HOVER color)
             spawn_button(
                 parent,
-                "スタート",
+                t("btn_start", lang),
                 ButtonAction::StartGame,
                 0,
                 FONT_SIZE_LARGE,
@@ -79,9 +82,33 @@ pub fn setup_title_screen(
             // Settings button (index 1)
             spawn_button(
                 parent,
-                "設定",
+                t("btn_settings", lang),
                 ButtonAction::OpenSettings,
                 1,
+                FONT_SIZE_LARGE,
+                BUTTON_LARGE_WIDTH,
+                BUTTON_LARGE_HEIGHT,
+                font.clone(),
+            );
+
+            // How-to-play button (index 2)
+            spawn_button(
+                parent,
+                t("btn_how_to_play", lang),
+                ButtonAction::OpenHowToPlay,
+                2,
+                FONT_SIZE_LARGE,
+                BUTTON_LARGE_WIDTH,
+                BUTTON_LARGE_HEIGHT,
+                font.clone(),
+            );
+
+            // Quit button (index 3)
+            spawn_button(
+                parent,
+                t("btn_quit", lang),
+                ButtonAction::QuitGame,
+                3,
                 FONT_SIZE_LARGE,
                 BUTTON_LARGE_WIDTH,
                 BUTTON_LARGE_HEIGHT,
@@ -91,7 +118,8 @@ pub fn setup_title_screen(
             // Highscore display
             parent.spawn((
                 Text::new(format!(
-                    "ハイスコア: {}",
+                    "{}: {}",
+                    t("highscore", lang),
                     format_score(game_state.highscore)
                 )),
                 TextFont {

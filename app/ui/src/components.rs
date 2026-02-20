@@ -4,9 +4,13 @@
 //! helper functions for spawning styled buttons and text nodes so that every
 //! screen can build its layout from the same building blocks.
 
+use bevy::app::AppExit;
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
+use suika_game_core::constants::storage::SAVE_DIR;
+use suika_game_core::persistence::save_settings;
 use suika_game_core::prelude::AppState;
+use suika_game_core::resources::settings::{Language, SettingsResource};
 
 use crate::styles::{BUTTON_HOVER, BUTTON_NORMAL, BUTTON_PRESSED, FONT_SIZE_MEDIUM, TEXT_COLOR};
 
@@ -62,8 +66,26 @@ pub enum ButtonAction {
     GoToTitle,
     /// Transition from Paused back to Playing — resumes the current game.
     ResumeGame,
-    /// Open the settings screen (not yet implemented).
+    /// Open the settings screen (Title → Settings).
     OpenSettings,
+    /// Open the how-to-play screen (Title → HowToPlay).
+    OpenHowToPlay,
+    /// Return to the Title screen (Settings / HowToPlay → Title).
+    BackToTitle,
+    /// Decrease BGM volume by 1 step (Settings screen).
+    BgmVolumeDown,
+    /// Increase BGM volume by 1 step (Settings screen).
+    BgmVolumeUp,
+    /// Decrease SFX volume by 1 step (Settings screen).
+    SfxVolumeDown,
+    /// Increase SFX volume by 1 step (Settings screen).
+    SfxVolumeUp,
+    /// Toggle visual effects on / off (Settings screen).
+    ToggleEffects,
+    /// Toggle UI language between Japanese and English (Settings screen).
+    ToggleLanguage,
+    /// Gracefully exit the application (Title screen).
+    QuitGame,
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +213,8 @@ pub fn spawn_menu_button(
 /// Handles mouse/touch interaction with [`MenuButton`] entities.
 ///
 /// Changes the button background color on hover/press and triggers the
-/// appropriate [`AppState`] transition when a button is clicked.
+/// appropriate [`AppState`] transition or settings mutation when a button is
+/// clicked.
 ///
 /// When the mouse leaves a button (`Interaction::None`), the keyboard-focus
 /// highlight is preserved if that button is currently focused by
@@ -208,25 +231,14 @@ pub fn handle_button_interaction(
     >,
     focus: Res<KeyboardFocusIndex>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut settings: ResMut<SettingsResource>,
+    mut app_exit: MessageWriter<AppExit>,
 ) {
     for (interaction, button, idx, mut bg) in interaction_query.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
                 *bg = BackgroundColor(BUTTON_PRESSED);
-                match button.action {
-                    ButtonAction::StartGame | ButtonAction::RetryGame => {
-                        next_state.set(AppState::Playing);
-                    }
-                    ButtonAction::GoToTitle => {
-                        next_state.set(AppState::Title);
-                    }
-                    ButtonAction::ResumeGame => {
-                        next_state.set(AppState::Playing);
-                    }
-                    ButtonAction::OpenSettings => {
-                        // Settings screen not yet implemented.
-                    }
-                }
+                apply_button_action(button.action, &mut next_state, &mut settings, &mut app_exit);
             }
             Interaction::Hovered => {
                 *bg = BackgroundColor(BUTTON_HOVER);
@@ -254,6 +266,8 @@ pub fn handle_keyboard_menu_navigation(
     mut focus: ResMut<KeyboardFocusIndex>,
     mut button_query: Query<(&ButtonIndex, &MenuButton, &mut BackgroundColor)>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut settings: ResMut<SettingsResource>,
+    mut app_exit: MessageWriter<AppExit>,
 ) {
     let count = button_query.iter().count();
     if count == 0 {
@@ -282,20 +296,78 @@ pub fn handle_keyboard_menu_navigation(
     if keyboard.just_pressed(KeyCode::Enter)
         && let Some((_, button, _)) = button_query.iter().find(|(idx, _, _)| idx.0 == focus.0)
     {
-        match button.action {
-            ButtonAction::StartGame | ButtonAction::RetryGame => {
-                next_state.set(AppState::Playing);
-            }
-            ButtonAction::GoToTitle => {
-                next_state.set(AppState::Title);
-            }
-            ButtonAction::ResumeGame => {
-                next_state.set(AppState::Playing);
-            }
-            ButtonAction::OpenSettings => {
-                // Settings screen not yet implemented.
-            }
+        let action = button.action;
+        apply_button_action(action, &mut next_state, &mut settings, &mut app_exit);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shared helper
+// ---------------------------------------------------------------------------
+
+/// Applies the effect of a [`ButtonAction`].
+///
+/// Extracted so that both the mouse-click and keyboard-Enter paths share the
+/// same logic without duplication.
+fn apply_button_action(
+    action: ButtonAction,
+    next_state: &mut ResMut<NextState<AppState>>,
+    settings: &mut ResMut<SettingsResource>,
+    app_exit: &mut MessageWriter<AppExit>,
+) {
+    match action {
+        ButtonAction::StartGame | ButtonAction::RetryGame => {
+            next_state.set(AppState::Playing);
         }
+        ButtonAction::GoToTitle | ButtonAction::BackToTitle => {
+            next_state.set(AppState::Title);
+        }
+        ButtonAction::ResumeGame => {
+            next_state.set(AppState::Playing);
+        }
+        ButtonAction::OpenSettings => {
+            next_state.set(AppState::Settings);
+        }
+        ButtonAction::OpenHowToPlay => {
+            next_state.set(AppState::HowToPlay);
+        }
+        ButtonAction::BgmVolumeDown => {
+            settings.bgm_volume = settings.bgm_volume.saturating_sub(1);
+            persist_settings(settings);
+        }
+        ButtonAction::BgmVolumeUp => {
+            settings.bgm_volume = (settings.bgm_volume + 1).min(10);
+            persist_settings(settings);
+        }
+        ButtonAction::SfxVolumeDown => {
+            settings.sfx_volume = settings.sfx_volume.saturating_sub(1);
+            persist_settings(settings);
+        }
+        ButtonAction::SfxVolumeUp => {
+            settings.sfx_volume = (settings.sfx_volume + 1).min(10);
+            persist_settings(settings);
+        }
+        ButtonAction::ToggleEffects => {
+            settings.effects_enabled = !settings.effects_enabled;
+            persist_settings(settings);
+        }
+        ButtonAction::ToggleLanguage => {
+            settings.language = match settings.language {
+                Language::Japanese => Language::English,
+                Language::English => Language::Japanese,
+            };
+            persist_settings(settings);
+        }
+        ButtonAction::QuitGame => {
+            app_exit.write(AppExit::Success);
+        }
+    }
+}
+
+/// Saves the current settings to disk, logging a warning on failure.
+fn persist_settings(settings: &SettingsResource) {
+    if let Err(e) = save_settings(settings, std::path::Path::new(SAVE_DIR)) {
+        warn!("Failed to save settings: {e}");
     }
 }
 
@@ -313,6 +385,10 @@ mod tests {
         assert_ne!(ButtonAction::StartGame, ButtonAction::RetryGame);
         assert_ne!(ButtonAction::GoToTitle, ButtonAction::ResumeGame);
         assert_ne!(ButtonAction::OpenSettings, ButtonAction::StartGame);
+        assert_ne!(ButtonAction::OpenHowToPlay, ButtonAction::OpenSettings);
+        assert_ne!(ButtonAction::BgmVolumeDown, ButtonAction::BgmVolumeUp);
+        assert_ne!(ButtonAction::SfxVolumeDown, ButtonAction::SfxVolumeUp);
+        assert_ne!(ButtonAction::ToggleEffects, ButtonAction::ToggleLanguage);
     }
 
     #[test]
@@ -321,6 +397,10 @@ mod tests {
         let a = ButtonAction::RetryGame;
         let b = a;
         assert_eq!(a, b);
+
+        let c = ButtonAction::BgmVolumeDown;
+        let d = c;
+        assert_eq!(c, d);
     }
 
     #[test]
