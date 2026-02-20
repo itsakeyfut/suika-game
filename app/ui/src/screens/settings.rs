@@ -104,7 +104,7 @@ pub struct TranslatableText(pub &'static str);
 ///
 /// Example for `vol = 8`: `"■■■■■■■■□□  80%"`.
 fn gauge_string(vol: u8) -> String {
-    let filled = vol as usize;
+    let filled = (vol as usize).min(10);
     let empty = 10 - filled;
     format!(
         "{}{}  {:3}%",
@@ -372,6 +372,9 @@ pub fn setup_settings_screen(
             );
 
             // Language row (arrow buttons: index 5 ◀, index 6 ▶)
+            // TODO: Both arrows use ToggleLanguage (symmetric toggle) because only
+            // two languages exist. If a third language is added, split into
+            // ButtonAction::ToggleLanguagePrev / ToggleLanguageNext with proper cycling.
             let lang_val = match settings.language {
                 Language::Japanese => t("lang_japanese", lang),
                 Language::English => t("lang_english", lang),
