@@ -31,7 +31,7 @@ use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use suika_game_core::events::{FruitMergeEvent, ScoreEarnedEvent};
 use suika_game_core::fruit::FruitType;
-use suika_game_ui::components::MenuButton;
+use suika_game_ui::components::{KeyboardFocusIndex, MenuButton};
 
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::SfxHandles;
@@ -288,26 +288,38 @@ pub fn play_ui_sfx(
 /// [`Interaction`] component is only updated by pointer devices, so
 /// W / S / Arrow keys and Enter must be handled independently.
 ///
-/// - W / S / Up / Down → `button_hover.wav` (focus moved to a new button)
-/// - Enter → `button_click.wav` (focused button confirmed)
+/// - W / S / Up / Down → `button_hover.wav`, **only when the focused button
+///   index actually changes**.  Pressing a navigation key at a list boundary
+///   (where focus cannot move further) does not produce a sound.
+/// - Enter → `button_click.wav` (confirms the currently focused button).
 ///
 /// The system is a no-op when no [`MenuButton`] entities are present (e.g.
 /// during gameplay), preventing stray sounds from key presses on the
 /// playing field.
+///
+/// [`prev_focus`] is a system-local value that tracks the focus index from the
+/// previous frame so that boundary presses can be detected without relying on
+/// execution order relative to the navigation system.
 pub fn play_keyboard_ui_sfx(
     keyboard: Res<ButtonInput<KeyCode>>,
     button_query: Query<(), With<MenuButton>>,
+    focus: Option<Res<KeyboardFocusIndex>>,
+    mut prev_focus: Local<Option<usize>>,
     audio: Res<Audio>,
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
 ) {
-    // No menu buttons on screen — nothing to do.
+    // No menu buttons on screen — reset tracking and bail.
     if button_query.is_empty() {
+        *prev_focus = None;
         return;
     }
 
+    let current = focus.as_ref().map(|r| r.0).unwrap_or(0);
+
     let Some(sfx_handles) = sfx_handles else {
+        *prev_focus = Some(current);
         return;
     };
 
@@ -317,14 +329,12 @@ pub fn play_keyboard_ui_sfx(
         .and_then(|h| audio_config_assets.get(&h.0))
         .unwrap_or(&default_cfg);
 
-    // Navigation key → hover sound (one sound per frame even if both W and S
-    // are pressed simultaneously, which is pathological but harmless).
-    let navigated = keyboard.just_pressed(KeyCode::KeyW)
-        || keyboard.just_pressed(KeyCode::ArrowUp)
-        || keyboard.just_pressed(KeyCode::KeyS)
-        || keyboard.just_pressed(KeyCode::ArrowDown);
-
-    if navigated {
+    // Hover sound: only when the focus index actually moved to a different
+    // button.  Comparing against the locally cached previous value avoids
+    // spurious sounds when a navigation key is pressed at a list boundary
+    // (where the index stays the same).
+    let old = prev_focus.replace(current);
+    if old.is_some_and(|p| p != current) {
         audio
             .play(sfx_handles.button_hover.clone())
             .with_volume(cfg.sfx_button_hover_volume);
@@ -485,16 +495,26 @@ mod tests {
     }
 
     #[test]
-    fn test_ui_sfx_volumes_are_non_positive_db() {
-        // UI button sounds should be quieter than full (≤ 0 dB) by default.
+    fn test_ui_sfx_volumes_are_audible_and_quiet() {
+        // UI button sounds should be quieter than full (≤ 0 dB) but still
+        // clearly audible (> -30 dB).  A value like -60 dB would be
+        // effectively silent and would pass a <= 0.0 check alone.
         let cfg = AudioConfig::default();
         assert!(
             cfg.sfx_button_click_volume <= 0.0,
             "button click volume should be ≤ 0 dB (quiet)"
         );
         assert!(
+            cfg.sfx_button_click_volume > -30.0,
+            "button click volume should be > -30 dB (audible)"
+        );
+        assert!(
             cfg.sfx_button_hover_volume <= 0.0,
             "button hover volume should be ≤ 0 dB (quiet)"
+        );
+        assert!(
+            cfg.sfx_button_hover_volume > -30.0,
+            "button hover volume should be > -30 dB (audible)"
         );
     }
 }
