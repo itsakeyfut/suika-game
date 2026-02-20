@@ -245,7 +245,7 @@ ron_asset_loader!(ScorePopupConfigLoader, ScorePopupConfig);
 pub fn hot_reload_hud_layout(
     mut events: MessageReader<AssetEvent<HudLayoutConfig>>,
     config_assets: Res<Assets<HudLayoutConfig>>,
-    config_handle: Res<HudLayoutConfigHandle>,
+    config_handle: Option<Res<HudLayoutConfigHandle>>,
     mut best_score_q: Query<
         &mut Node,
         (
@@ -271,6 +271,9 @@ pub fn hot_reload_hud_layout(
         ),
     >,
 ) {
+    let Some(config_handle) = config_handle else {
+        return;
+    };
     for event in events.read() {
         if let AssetEvent::Modified { .. } = event
             && let Some(cfg) = config_assets.get(&config_handle.0)
@@ -296,9 +299,12 @@ pub fn hot_reload_hud_layout(
 pub fn hot_reload_score_hud(
     mut events: MessageReader<AssetEvent<ScoreHudConfig>>,
     config_assets: Res<Assets<ScoreHudConfig>>,
-    config_handle: Res<ScoreHudConfigHandle>,
+    config_handle: Option<Res<ScoreHudConfigHandle>>,
     mut panel_q: Query<&mut Node, With<crate::screens::hud::score::HudScorePanel>>,
 ) {
+    let Some(config_handle) = config_handle else {
+        return;
+    };
     for event in events.read() {
         if let AssetEvent::Modified { .. } = event
             && let Some(cfg) = config_assets.get(&config_handle.0)
@@ -316,9 +322,12 @@ pub fn hot_reload_score_hud(
 pub fn hot_reload_best_score_hud(
     mut events: MessageReader<AssetEvent<BestScoreHudConfig>>,
     config_assets: Res<Assets<BestScoreHudConfig>>,
-    config_handle: Res<BestScoreHudConfigHandle>,
+    config_handle: Option<Res<BestScoreHudConfigHandle>>,
     mut panel_q: Query<&mut Node, With<crate::screens::hud::best_score::HudBestScorePanel>>,
 ) {
+    let Some(config_handle) = config_handle else {
+        return;
+    };
     for event in events.read() {
         if let AssetEvent::Modified { .. } = event
             && let Some(cfg) = config_assets.get(&config_handle.0)
@@ -336,9 +345,12 @@ pub fn hot_reload_best_score_hud(
 pub fn hot_reload_next_hud(
     mut events: MessageReader<AssetEvent<NextHudConfig>>,
     config_assets: Res<Assets<NextHudConfig>>,
-    config_handle: Res<NextHudConfigHandle>,
+    config_handle: Option<Res<NextHudConfigHandle>>,
     mut preview_q: Query<&mut Node, With<crate::screens::hud::next::HudNextPreview>>,
 ) {
+    let Some(config_handle) = config_handle else {
+        return;
+    };
     for event in events.read() {
         if let AssetEvent::Modified { .. } = event
             && let Some(cfg) = config_assets.get(&config_handle.0)
@@ -421,5 +433,86 @@ impl Plugin for UiConfigPlugin {
         );
 
         info!("✅ UiConfigPlugin initialized");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hud_layout_config_defaults() {
+        let cfg = HudLayoutConfig::default();
+        assert!(cfg.edge_margin > 0.0);
+        assert!(cfg.score_panel_offset > 0.0);
+        assert!(cfg.next_top >= 0.0);
+        assert!(cfg.next_right > 0.0);
+    }
+
+    #[test]
+    fn test_hud_layout_config_ron_partial_fields_use_defaults() {
+        let ron_str = r#"HudLayoutConfig(edge_margin: 32.0)"#;
+        let cfg: HudLayoutConfig = ron::de::from_str(ron_str).expect("RON parse must succeed");
+        assert_eq!(cfg.edge_margin, 32.0);
+        assert_eq!(
+            cfg.score_panel_offset,
+            HudLayoutConfig::default().score_panel_offset
+        );
+    }
+
+    #[test]
+    fn test_score_hud_config_defaults() {
+        let cfg = ScoreHudConfig::default();
+        assert!(cfg.panel_padding > 0.0);
+        assert!(cfg.label_value_gap >= 0.0);
+        assert!(cfg.pulse_duration > 0.0);
+        assert!(cfg.pulse_peak_scale > 1.0, "pulse should scale above 1.0");
+    }
+
+    #[test]
+    fn test_score_hud_config_ron_partial_fields_use_defaults() {
+        let ron_str = r#"ScoreHudConfig(panel_padding: 20.0)"#;
+        let cfg: ScoreHudConfig = ron::de::from_str(ron_str).expect("RON parse must succeed");
+        assert_eq!(cfg.panel_padding, 20.0);
+        assert_eq!(cfg.pulse_duration, DEFAULT_SCORE_PULSE_DURATION);
+    }
+
+    #[test]
+    fn test_best_score_hud_config_ron_partial_fields_use_defaults() {
+        let ron_str = r#"BestScoreHudConfig(label_value_gap: 8.0)"#;
+        let cfg: BestScoreHudConfig = ron::de::from_str(ron_str).expect("RON parse must succeed");
+        assert_eq!(cfg.label_value_gap, 8.0);
+        assert_eq!(cfg.panel_padding, DEFAULT_BEST_SCORE_PANEL_PADDING);
+    }
+
+    #[test]
+    fn test_next_hud_config_ron_roundtrip() {
+        let ron_str = r#"NextHudConfig(preview_size: 120.0)"#;
+        let cfg: NextHudConfig = ron::de::from_str(ron_str).expect("RON parse must succeed");
+        assert_eq!(cfg.preview_size, 120.0);
+    }
+
+    #[test]
+    fn test_score_popup_config_defaults_are_sensible() {
+        let cfg = ScorePopupConfig::default();
+        assert!(cfg.duration > 0.0);
+        assert!(cfg.rise_distance > 0.0);
+        assert!(cfg.font_size_per_radius > 0.0);
+        assert!((0.0..=1.0).contains(&cfg.fade_start_fraction));
+        assert!(cfg.rainbow_hue_speed > 0.0);
+        assert!(cfg.z_layer > 0.0);
+    }
+
+    #[test]
+    fn test_score_popup_config_ron_partial_fields_use_defaults() {
+        let ron_str = r#"ScorePopupConfig(duration: 2.0)"#;
+        let cfg: ScorePopupConfig = ron::de::from_str(ron_str).expect("RON parse must succeed");
+        assert_eq!(cfg.duration, 2.0);
+        assert_eq!(cfg.rise_distance, DEFAULT_POPUP_RISE_DISTANCE);
+        assert_eq!(cfg.rainbow_hue_speed, DEFAULT_POPUP_RAINBOW_HUE_SPEED);
     }
 }

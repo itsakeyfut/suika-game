@@ -529,7 +529,7 @@ fn hot_reload_fruits_config(
 macro_rules! ron_asset_loader {
     ($loader:ident, $asset:ty) => {
         #[derive(Default)]
-        pub struct $loader;
+        struct $loader;
 
         impl AssetLoader for $loader {
             type Asset = $asset;

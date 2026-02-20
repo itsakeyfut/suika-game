@@ -300,6 +300,7 @@ pub fn play_ui_sfx(
 /// [`prev_focus`] is a system-local value that tracks the focus index from the
 /// previous frame so that boundary presses can be detected without relying on
 /// execution order relative to the navigation system.
+#[allow(clippy::too_many_arguments)]
 pub fn play_keyboard_ui_sfx(
     keyboard: Res<ButtonInput<KeyCode>>,
     button_query: Query<(), With<MenuButton>>,

@@ -32,167 +32,85 @@ use serde::Deserialize;
 /// `Option<Res<AudioConfigHandle>>` + `Res<Assets<AudioConfig>>` and fall
 /// back to [`AudioConfig::default()`] when the asset is not yet loaded.
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct AudioConfig {
     // --- BGM ---
     /// Volume for the title-screen BGM track (dB, 0 = full).
-    #[serde(default = "default_bgm_title_volume")]
     pub bgm_title_volume: f32,
     /// Volume for the in-game BGM track (dB, 0 = full).
-    #[serde(default = "default_bgm_game_volume")]
     pub bgm_game_volume: f32,
     /// Volume for the game-over BGM track (dB, 0 = full).
-    #[serde(default = "default_bgm_gameover_volume")]
     pub bgm_gameover_volume: f32,
     /// Fade-out duration when switching away from any BGM track (seconds).
-    #[serde(default = "default_bgm_fade_out_secs")]
     pub bgm_fade_out_secs: f32,
     /// Fade-in duration for the title BGM (seconds).
-    #[serde(default = "default_bgm_title_fade_in_secs")]
     pub bgm_title_fade_in_secs: f32,
     /// Fade-in duration for the game BGM (seconds).
-    #[serde(default = "default_bgm_game_fade_in_secs")]
     pub bgm_game_fade_in_secs: f32,
 
     // --- SFX ---
     /// Volume for the fruit-drop sound (dB, 0 = full).
-    #[serde(default = "default_sfx_drop_volume")]
     pub sfx_drop_volume: f32,
     /// Volume for the small-fruit merge sound (dB, 0 = full).
-    #[serde(default = "default_sfx_merge_small_volume")]
     pub sfx_merge_small_volume: f32,
     /// Volume for the medium-fruit merge sound (dB, 0 = full).
-    #[serde(default = "default_sfx_merge_medium_volume")]
     pub sfx_merge_medium_volume: f32,
     /// Volume for the large-fruit merge sound (dB, 0 = full).
-    #[serde(default = "default_sfx_merge_large_volume")]
     pub sfx_merge_large_volume: f32,
     /// Volume for the watermelon-merge fanfare (dB, 0 = full).
-    #[serde(default = "default_sfx_watermelon_volume")]
     pub sfx_watermelon_volume: f32,
     /// Volume for the combo-chain sound (dB, 0 = full).
-    #[serde(default = "default_sfx_combo_volume")]
     pub sfx_combo_volume: f32,
     /// Volume for the game-over sting (dB, 0 = full).
-    #[serde(default = "default_sfx_gameover_volume")]
     pub sfx_gameover_volume: f32,
     /// Volume for UI button-click sounds (dB, 0 = full).
-    #[serde(default = "default_sfx_button_click_volume")]
     pub sfx_button_click_volume: f32,
     /// Volume for UI button-hover sounds (dB, 0 = full).
-    #[serde(default = "default_sfx_button_hover_volume")]
     pub sfx_button_hover_volume: f32,
 
     // --- SFX pitch (playback rate multiplier; 1.0 = original pitch) ---
     /// Playback rate for the small-fruit merge sound (Cherry, Strawberry, Grape).
-    #[serde(default = "default_sfx_merge_small_pitch")]
     pub sfx_merge_small_pitch: f64,
     /// Playback rate for the medium-fruit merge sound (Dekopon through Pear).
-    #[serde(default = "default_sfx_merge_medium_pitch")]
     pub sfx_merge_medium_pitch: f64,
     /// Playback rate for the large-fruit merge sound (Peach, Pineapple).
-    #[serde(default = "default_sfx_merge_large_pitch")]
     pub sfx_merge_large_pitch: f64,
     /// Pitch increment added per combo count for the combo sound.
     ///
     /// Combo pitch = `1.0 + (combo_count × sfx_combo_pitch_step).min(sfx_combo_pitch_cap)`.
-    #[serde(default = "default_sfx_combo_pitch_step")]
     pub sfx_combo_pitch_step: f64,
     /// Maximum pitch offset added on top of 1.0 for the combo sound.
     ///
     /// Caps the value of `combo_count × sfx_combo_pitch_step` so the pitch
     /// does not grow unboundedly at very high combo counts.
-    #[serde(default = "default_sfx_combo_pitch_cap")]
     pub sfx_combo_pitch_cap: f64,
 }
 
 // Default values — these match the hard-coded constants that bgm.rs used
 // before the config was introduced, so existing behaviour is preserved when
 // the RON file is absent or a field is omitted.
-pub const DEFAULT_BGM_TITLE_VOLUME: f32 = -4.0;
-pub const DEFAULT_BGM_GAME_VOLUME: f32 = -8.0;
-pub const DEFAULT_BGM_GAMEOVER_VOLUME: f32 = -6.0;
-pub const DEFAULT_BGM_FADE_OUT_SECS: f32 = 0.5;
-pub const DEFAULT_BGM_TITLE_FADE_IN_SECS: f32 = 0.3;
-pub const DEFAULT_BGM_GAME_FADE_IN_SECS: f32 = 0.3;
-pub const DEFAULT_SFX_DROP_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_MERGE_SMALL_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_MERGE_MEDIUM_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_MERGE_LARGE_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_WATERMELON_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_COMBO_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_GAMEOVER_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_BUTTON_CLICK_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_BUTTON_HOVER_VOLUME: f32 = 0.0;
-pub const DEFAULT_SFX_MERGE_SMALL_PITCH: f64 = 1.2;
-pub const DEFAULT_SFX_MERGE_MEDIUM_PITCH: f64 = 1.0;
-pub const DEFAULT_SFX_MERGE_LARGE_PITCH: f64 = 0.8;
+const DEFAULT_BGM_TITLE_VOLUME: f32 = -4.0;
+const DEFAULT_BGM_GAME_VOLUME: f32 = -8.0;
+const DEFAULT_BGM_GAMEOVER_VOLUME: f32 = -6.0;
+const DEFAULT_BGM_FADE_OUT_SECS: f32 = 0.5;
+const DEFAULT_BGM_TITLE_FADE_IN_SECS: f32 = 0.3;
+const DEFAULT_BGM_GAME_FADE_IN_SECS: f32 = 0.3;
+const DEFAULT_SFX_DROP_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_MERGE_SMALL_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_MERGE_MEDIUM_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_MERGE_LARGE_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_WATERMELON_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_COMBO_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_GAMEOVER_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_BUTTON_CLICK_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_BUTTON_HOVER_VOLUME: f32 = 0.0;
+const DEFAULT_SFX_MERGE_SMALL_PITCH: f64 = 1.2;
+const DEFAULT_SFX_MERGE_MEDIUM_PITCH: f64 = 1.0;
+const DEFAULT_SFX_MERGE_LARGE_PITCH: f64 = 0.8;
 /// Pitch added per combo count (e.g. 0.1 → combo 2 = 1.2×, combo 5 = 1.5×).
-pub const DEFAULT_SFX_COMBO_PITCH_STEP: f64 = 0.1;
+const DEFAULT_SFX_COMBO_PITCH_STEP: f64 = 0.1;
 /// Maximum pitch offset above 1.0 for the combo sound (caps the step scaling).
-pub const DEFAULT_SFX_COMBO_PITCH_CAP: f64 = 0.5;
-
-// serde requires function pointers for #[serde(default = "...")], so each
-// constant is exposed through a thin forwarding function.
-fn default_bgm_title_volume() -> f32 {
-    DEFAULT_BGM_TITLE_VOLUME
-}
-fn default_bgm_game_volume() -> f32 {
-    DEFAULT_BGM_GAME_VOLUME
-}
-fn default_bgm_gameover_volume() -> f32 {
-    DEFAULT_BGM_GAMEOVER_VOLUME
-}
-fn default_bgm_fade_out_secs() -> f32 {
-    DEFAULT_BGM_FADE_OUT_SECS
-}
-fn default_bgm_title_fade_in_secs() -> f32 {
-    DEFAULT_BGM_TITLE_FADE_IN_SECS
-}
-fn default_bgm_game_fade_in_secs() -> f32 {
-    DEFAULT_BGM_GAME_FADE_IN_SECS
-}
-fn default_sfx_drop_volume() -> f32 {
-    DEFAULT_SFX_DROP_VOLUME
-}
-fn default_sfx_merge_small_volume() -> f32 {
-    DEFAULT_SFX_MERGE_SMALL_VOLUME
-}
-fn default_sfx_merge_medium_volume() -> f32 {
-    DEFAULT_SFX_MERGE_MEDIUM_VOLUME
-}
-fn default_sfx_merge_large_volume() -> f32 {
-    DEFAULT_SFX_MERGE_LARGE_VOLUME
-}
-fn default_sfx_watermelon_volume() -> f32 {
-    DEFAULT_SFX_WATERMELON_VOLUME
-}
-fn default_sfx_combo_volume() -> f32 {
-    DEFAULT_SFX_COMBO_VOLUME
-}
-fn default_sfx_gameover_volume() -> f32 {
-    DEFAULT_SFX_GAMEOVER_VOLUME
-}
-fn default_sfx_button_click_volume() -> f32 {
-    DEFAULT_SFX_BUTTON_CLICK_VOLUME
-}
-fn default_sfx_button_hover_volume() -> f32 {
-    DEFAULT_SFX_BUTTON_HOVER_VOLUME
-}
-fn default_sfx_merge_small_pitch() -> f64 {
-    DEFAULT_SFX_MERGE_SMALL_PITCH
-}
-fn default_sfx_merge_medium_pitch() -> f64 {
-    DEFAULT_SFX_MERGE_MEDIUM_PITCH
-}
-fn default_sfx_merge_large_pitch() -> f64 {
-    DEFAULT_SFX_MERGE_LARGE_PITCH
-}
-fn default_sfx_combo_pitch_step() -> f64 {
-    DEFAULT_SFX_COMBO_PITCH_STEP
-}
-fn default_sfx_combo_pitch_cap() -> f64 {
-    DEFAULT_SFX_COMBO_PITCH_CAP
-}
+const DEFAULT_SFX_COMBO_PITCH_CAP: f64 = 0.5;
 
 impl Default for AudioConfig {
     fn default() -> Self {
