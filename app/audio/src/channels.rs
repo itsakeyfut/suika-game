@@ -60,7 +60,8 @@ pub fn volume_to_db(vol: u8) -> f32 {
     if vol == 0 {
         return -100.0;
     }
-    (vol as f32 / 10.0 - 1.0) * 40.0
+    let clamped = vol.min(10);
+    (clamped as f32 / 10.0 - 1.0) * 40.0
 }
 
 // ---------------------------------------------------------------------------
@@ -163,5 +164,12 @@ mod tests {
         // vol=5 → (0.5 − 1.0) × 40 = −20 dB
         let db = volume_to_db(5);
         assert!((db - (-20.0)).abs() < 1e-4, "got {db}");
+    }
+
+    #[test]
+    fn test_volume_to_db_clamps_above_10() {
+        // Values above the slider maximum must not produce amplification (> 0 dB).
+        assert_eq!(volume_to_db(11), volume_to_db(10));
+        assert_eq!(volume_to_db(255), volume_to_db(10));
     }
 }

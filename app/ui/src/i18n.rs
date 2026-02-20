@@ -86,6 +86,8 @@ pub fn t(key: &'static str, lang: Language) -> &'static str {
         ("btn_title", Language::English) => "To Title",
 
         // ── Game-over screen ──────────────────────────────────────────────
+        ("game_over_title", Language::Japanese) => "ゲームオーバー",
+        ("game_over_title", Language::English) => "GAME OVER",
         ("score", Language::Japanese) => "スコア",
         ("score", Language::English) => "Score",
         ("new_record", Language::Japanese) => "NEW RECORD!",
@@ -136,21 +138,49 @@ mod tests {
     #[test]
     fn test_all_screen_keys_non_empty() {
         let keys = [
+            // Title
             "game_title",
             "btn_start",
             "btn_settings",
             "btn_how_to_play",
+            "highscore",
+            "btn_quit",
+            // Settings
             "settings_title",
             "label_bgm",
             "label_sfx",
             "label_effects",
             "label_language",
+            "value_on",
+            "value_off",
+            "lang_japanese",
+            "lang_english",
             "btn_back",
+            // How to play
             "how_to_play_title",
             "htp_drop_title",
+            "htp_drop_body",
             "htp_merge_title",
+            "htp_merge_body",
             "htp_evolve_title",
+            "htp_evolve_body",
             "htp_gameover_title",
+            "htp_gameover_body",
+            // Pause
+            "pause_title",
+            "btn_resume",
+            "btn_title",
+            // Game over
+            "game_over_title",
+            "score",
+            "new_record",
+            "highscore",
+            "elapsed_time",
+            "btn_retry",
+            // HUD
+            "hud_best_score",
+            "hud_score",
+            "hud_next",
         ];
         for key in &keys {
             assert!(

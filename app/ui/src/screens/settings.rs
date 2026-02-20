@@ -64,8 +64,12 @@ const ROW_WIDTH: f32 = LABEL_WIDTH
 const TOGGLE_BTN_WIDTH: f32 = ROW_WIDTH - LABEL_WIDTH - COL_GAP - BTN_MARGIN * 2.0;
 
 // ---------------------------------------------------------------------------
-// Marker components (local — not exported)
+// Marker components
 // ---------------------------------------------------------------------------
+//
+// These are `pub` so that `lib.rs` can reference them when registering
+// `update_settings_display` and `update_translatable_texts` with type-erased
+// query filters, and to allow future test utilities to inspect the entities.
 
 /// Marks the text node that shows the BGM volume gauge.
 #[derive(Component)]

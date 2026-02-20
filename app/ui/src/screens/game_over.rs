@@ -73,9 +73,9 @@ pub fn setup_game_over_screen(
             DespawnOnExit(AppState::GameOver),
         ))
         .with_children(|parent| {
-            // "GAME OVER" heading
+            // Game-over heading
             parent.spawn((
-                Text::new("GAME OVER"),
+                Text::new(t("game_over_title", lang)),
                 TextFont {
                     font: font.clone(),
                     font_size: FONT_SIZE_HUGE,
