@@ -29,4 +29,9 @@ AudioConfig(
     sfx_gameover_volume:      0.0,
     sfx_button_click_volume:  0.0,
     sfx_button_hover_volume:  0.0,
+
+    // --- SFX pitch (playback rate; 1.0 = original pitch) ---
+    sfx_merge_small_pitch:   1.2,
+    sfx_merge_medium_pitch:  1.0,
+    sfx_merge_large_pitch:   0.8,
 )

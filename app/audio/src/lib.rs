@@ -20,9 +20,7 @@ use suika_game_core::prelude::AppState;
 pub mod bgm;
 pub mod config;
 pub mod handles;
-
-// Future modules (uncomment as tasks are completed):
-// pub mod sfx;
+pub mod sfx;
 
 /// Integrates [`bevy_kira_audio`] into the game and registers all audio systems.
 ///
@@ -60,14 +58,10 @@ impl Plugin for GameAudioPlugin {
                 (
                     bgm::switch_bgm_on_state_change.run_if(state_changed::<AppState>),
                     config::hot_reload_audio_config,
+                    sfx::play_merge_sfx,
                 ),
             );
 
         info!("GameAudioPlugin initialized (bevy_kira_audio ready)");
-
-        // TODO: register systems when subsequent audio tasks are implemented:
-        // app
-        //     .add_systems(Update, (sfx::play_merge_sfx, sfx::play_combo_sfx, sfx::play_ui_sfx))
-        //     .add_systems(OnEnter(AppState::GameOver), sfx::play_gameover_sfx);
     }
 }

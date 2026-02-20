@@ -81,6 +81,17 @@ pub struct AudioConfig {
     /// Volume for UI button-hover sounds (dB, 0 = full).
     #[serde(default = "default_sfx_button_hover_volume")]
     pub sfx_button_hover_volume: f32,
+
+    // --- SFX pitch (playback rate multiplier; 1.0 = original pitch) ---
+    /// Playback rate for the small-fruit merge sound (Cherry, Strawberry, Grape).
+    #[serde(default = "default_sfx_merge_small_pitch")]
+    pub sfx_merge_small_pitch: f64,
+    /// Playback rate for the medium-fruit merge sound (Dekopon through Pear).
+    #[serde(default = "default_sfx_merge_medium_pitch")]
+    pub sfx_merge_medium_pitch: f64,
+    /// Playback rate for the large-fruit merge sound (Peach, Pineapple).
+    #[serde(default = "default_sfx_merge_large_pitch")]
+    pub sfx_merge_large_pitch: f64,
 }
 
 // Default values — these match the hard-coded constants that bgm.rs used
@@ -101,6 +112,9 @@ pub const DEFAULT_SFX_COMBO_VOLUME: f32 = 0.0;
 pub const DEFAULT_SFX_GAMEOVER_VOLUME: f32 = 0.0;
 pub const DEFAULT_SFX_BUTTON_CLICK_VOLUME: f32 = 0.0;
 pub const DEFAULT_SFX_BUTTON_HOVER_VOLUME: f32 = 0.0;
+pub const DEFAULT_SFX_MERGE_SMALL_PITCH: f64 = 1.2;
+pub const DEFAULT_SFX_MERGE_MEDIUM_PITCH: f64 = 1.0;
+pub const DEFAULT_SFX_MERGE_LARGE_PITCH: f64 = 0.8;
 
 // serde requires function pointers for #[serde(default = "...")], so each
 // constant is exposed through a thin forwarding function.
@@ -149,6 +163,15 @@ fn default_sfx_button_click_volume() -> f32 {
 fn default_sfx_button_hover_volume() -> f32 {
     DEFAULT_SFX_BUTTON_HOVER_VOLUME
 }
+fn default_sfx_merge_small_pitch() -> f64 {
+    DEFAULT_SFX_MERGE_SMALL_PITCH
+}
+fn default_sfx_merge_medium_pitch() -> f64 {
+    DEFAULT_SFX_MERGE_MEDIUM_PITCH
+}
+fn default_sfx_merge_large_pitch() -> f64 {
+    DEFAULT_SFX_MERGE_LARGE_PITCH
+}
 
 impl Default for AudioConfig {
     fn default() -> Self {
@@ -168,6 +191,9 @@ impl Default for AudioConfig {
             sfx_gameover_volume: DEFAULT_SFX_GAMEOVER_VOLUME,
             sfx_button_click_volume: DEFAULT_SFX_BUTTON_CLICK_VOLUME,
             sfx_button_hover_volume: DEFAULT_SFX_BUTTON_HOVER_VOLUME,
+            sfx_merge_small_pitch: DEFAULT_SFX_MERGE_SMALL_PITCH,
+            sfx_merge_medium_pitch: DEFAULT_SFX_MERGE_MEDIUM_PITCH,
+            sfx_merge_large_pitch: DEFAULT_SFX_MERGE_LARGE_PITCH,
         }
     }
 }
