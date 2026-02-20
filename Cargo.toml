@@ -17,7 +17,7 @@ authors = ["Your Name <your.email@example.com>"]
 # 外部依存関係（共通バージョン管理）
 bevy = { version = "0.17.3", features = ["file_watcher"] }
 bevy_rapier2d = "0.32.0"
-bevy_kira_audio = "0.24.0"
+bevy_kira_audio = { version = "0.24.0", features = ["wav"] }
 bevy-inspector-egui = "0.35.0"
 rand = "0.10.0"
 ron = "0.12.0"
