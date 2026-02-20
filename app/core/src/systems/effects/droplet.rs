@@ -8,10 +8,7 @@ use bevy::prelude::*;
 use rand::RngExt;
 
 use crate::components::{Fruit, FruitSpawnState};
-use crate::config::{
-    BounceConfig, BounceConfigHandle, DropletColorMode, DropletConfig, DropletParams,
-    PhysicsConfig, PhysicsConfigHandle,
-};
+use crate::config::{BounceParams, DropletColorMode, DropletConfig, DropletParams, PhysicsParams};
 use crate::events::FruitMergeEvent;
 use crate::systems::effects::bounce::SquashStretchAnimation;
 
@@ -176,14 +173,10 @@ pub fn handle_fruit_landing(
         (With<Fruit>, Changed<FruitSpawnState>),
     >,
     droplet: DropletParams<'_>,
-    bounce_config_handle: Option<Res<BounceConfigHandle>>,
-    bounce_config_assets: Option<Res<Assets<BounceConfig>>>,
+    bounce: BounceParams<'_>,
 ) {
     let droplet_cfg = droplet.get();
-    let bounce_cfg = bounce_config_handle
-        .as_ref()
-        .zip(bounce_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0));
+    let bounce_cfg = bounce.get();
 
     let count = droplet_cfg
         .map(|c| c.count_landing)
@@ -217,16 +210,13 @@ pub fn update_water_droplets(
     mut commands: Commands,
     mut droplets: Query<(Entity, &mut WaterDroplet, &mut Transform, &mut Sprite)>,
     time: Res<Time>,
-    physics_config_handle: Option<Res<PhysicsConfigHandle>>,
-    physics_config_assets: Option<Res<Assets<PhysicsConfig>>>,
+    physics: PhysicsParams<'_>,
     droplet: DropletParams<'_>,
 ) {
     let dt = time.delta_secs();
 
-    let (half_w, half_h) = physics_config_handle
-        .as_ref()
-        .zip(physics_config_assets.as_ref())
-        .and_then(|(h, a)| a.get(&h.0))
+    let (half_w, half_h) = physics
+        .get()
         .map(|cfg| (cfg.container_width / 2.0, cfg.container_height / 2.0))
         .unwrap_or((300.0, 400.0));
 

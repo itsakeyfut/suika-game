@@ -194,6 +194,11 @@ impl<'w> GameRulesParams<'w> {
 // Helper functions (used by hot-reload systems)
 // ---------------------------------------------------------------------------
 
+/// Fallback fruit collision radius when `FruitsConfig` is unavailable or a
+/// fruit type has no config entry. Chosen to be a safe conservative value
+/// that avoids incorrectly despawning fruits on physics hot-reload.
+const DEFAULT_FRUIT_RADIUS: f32 = 20.0;
+
 /// Updates Rapier's gravity setting when physics config changes
 pub fn update_rapier_gravity(rapier_config: &mut RapierConfiguration, new_gravity: f32) {
     rapier_config.gravity = Vec2::new(0.0, new_gravity);
@@ -453,9 +458,9 @@ pub fn hot_reload_physics_config(
                             fruit_type
                                 .try_parameters_from_config(fruits_config)
                                 .map(|p| p.radius)
-                                .unwrap_or(20.0)
+                                .unwrap_or(DEFAULT_FRUIT_RADIUS)
                         } else {
-                            20.0
+                            DEFAULT_FRUIT_RADIUS
                         };
 
                         if is_out_of_bounds(transform.translation, radius, config) {
