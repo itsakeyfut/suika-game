@@ -3,11 +3,16 @@
 //! Two types of flash effects on fruit merge:
 //! - **Local flash**: a bright circle at the merge point that expands and fades
 //! - **Screen flash**: a full-screen overlay for large-fruit merges (Pineapple+)
+//!
+//! When [`crate::shaders::ShadersPlugin`] is loaded the local flash is rendered
+//! through [`crate::shaders::RadialGradientMaterial`] (radial gradient shader).
+//! In headless / test contexts the fallback plain-`Sprite` path is used.
 
 use bevy::prelude::*;
 
 use crate::config::FlashParams;
 use crate::events::FruitMergeEvent;
+use crate::shaders::{RadialGradientMaterial, UnitQuadMesh};
 
 // --- Constants ---
 
@@ -30,7 +35,7 @@ pub const SCREEN_FLASH_MIN_INDEX: usize = 8;
 
 /// Local flash animation component
 ///
-/// A sprite at the merge position that expands and fades out.
+/// A sprite / radial-gradient mesh at the merge position that expands and fades.
 /// Uses the merged fruit's placeholder color.
 #[derive(Component, Debug)]
 pub struct LocalFlashAnimation {
@@ -42,6 +47,10 @@ pub struct LocalFlashAnimation {
     pub initial_size: Vec2,
     /// Color (derived from the merged fruit)
     pub color: Color,
+    /// Current size (computed by [`animate_local_flash`], applied by sync systems).
+    pub current_size: Vec2,
+    /// Current alpha (computed by [`animate_local_flash`], applied by sync systems).
+    pub current_alpha: f32,
 }
 
 /// Screen flash animation component
@@ -71,6 +80,8 @@ pub fn spawn_merge_flash(
     fruits_config_handle: Option<Res<crate::config::FruitsConfigHandle>>,
     fruits_config_assets: Option<Res<Assets<crate::config::FruitsConfig>>>,
     flash: FlashParams<'_>,
+    unit_quad: Option<Res<UnitQuadMesh>>,
+    mut radial_gradient_materials: Option<ResMut<Assets<RadialGradientMaterial>>>,
 ) {
     let fruit_config = fruits_config_handle
         .as_ref()
@@ -107,24 +118,49 @@ pub fn spawn_merge_flash(
             .unwrap_or(30.0);
 
         let initial_size = Vec2::splat(fruit_radius * local_size_multiplier);
+        let linear_color = color.to_linear();
 
-        // Spawn local flash at Z=5 (above fruits but below UI)
-        // TODO: 将来的に Material2d + WGSL フラグメントシェーダーで
-        //       放射状グラデーション（中心が明るく、外に向かってフェード）に変更する
-        commands.spawn((
-            LocalFlashAnimation {
-                elapsed: 0.0,
-                duration: local_duration,
-                initial_size,
-                color,
-            },
-            Sprite {
-                color: color.with_alpha(local_initial_alpha),
-                custom_size: Some(initial_size),
-                ..default()
-            },
-            Transform::from_translation(event.position.extend(5.0)),
-        ));
+        let flash_anim = LocalFlashAnimation {
+            elapsed: 0.0,
+            duration: local_duration,
+            initial_size,
+            color,
+            current_size: initial_size,
+            current_alpha: local_initial_alpha,
+        };
+
+        // Spawn local flash — shader path when assets are available, Sprite otherwise.
+        match (unit_quad.as_ref(), radial_gradient_materials.as_mut()) {
+            (Some(quad), Some(mats)) => {
+                let mat_color = LinearRgba {
+                    alpha: local_initial_alpha,
+                    ..linear_color
+                };
+                let mat = mats.add(RadialGradientMaterial { color: mat_color });
+                commands.spawn((
+                    flash_anim,
+                    Mesh2d(quad.0.clone()),
+                    MeshMaterial2d(mat),
+                    Transform::from_translation(event.position.extend(5.0)).with_scale(Vec3::new(
+                        initial_size.x,
+                        initial_size.y,
+                        1.0,
+                    )),
+                ));
+            }
+            _ => {
+                // Sprite fallback (headless / test contexts)
+                commands.spawn((
+                    flash_anim,
+                    Sprite {
+                        color: color.with_alpha(local_initial_alpha),
+                        custom_size: Some(initial_size),
+                        ..default()
+                    },
+                    Transform::from_translation(event.position.extend(5.0)),
+                ));
+            }
+        }
 
         // Screen flash for large-fruit merges only
         let fruit_index = event.fruit_type as usize;
@@ -147,21 +183,14 @@ pub fn spawn_merge_flash(
     }
 }
 
-/// Animates local flash: expands the sprite and fades out the alpha
+/// Advances local flash timing and computes current size / alpha.
 ///
-/// Each frame:
-/// 1. Increments elapsed
-/// 2. Fades alpha from `LOCAL_FLASH_INITIAL_ALPHA` → 0
-/// 3. Expands sprite size slightly
-/// 4. Despawns when duration is reached
+/// Despawns the entity when its duration is reached.  Separate sync systems
+/// ([`sync_local_flash_sprite`], [`sync_local_flash_material`]) apply the
+/// computed values to the visual representation.
 pub fn animate_local_flash(
     mut commands: Commands,
-    mut flashes: Query<(
-        Entity,
-        &mut LocalFlashAnimation,
-        &mut Sprite,
-        &mut Transform,
-    )>,
+    mut flashes: Query<(Entity, &mut LocalFlashAnimation)>,
     time: Res<Time>,
     flash: FlashParams<'_>,
 ) {
@@ -170,7 +199,7 @@ pub fn animate_local_flash(
         .map(|c| c.local_initial_alpha)
         .unwrap_or(LOCAL_FLASH_INITIAL_ALPHA);
 
-    for (entity, mut flash, mut sprite, mut transform) in flashes.iter_mut() {
+    for (entity, mut flash) in flashes.iter_mut() {
         flash.elapsed += time.delta_secs();
 
         if flash.elapsed >= flash.duration {
@@ -179,13 +208,52 @@ pub fn animate_local_flash(
         }
 
         let progress = (flash.elapsed / flash.duration).clamp(0.0, 1.0);
-        let alpha = initial_alpha * (1.0 - progress);
+        flash.current_alpha = initial_alpha * (1.0 - progress);
         // Expand to 1.5× the initial size over the duration
-        let size = flash.initial_size * (1.0 + progress * 0.5);
+        flash.current_size = flash.initial_size * (1.0 + progress * 0.5);
+    }
+}
 
-        sprite.color = flash.color.with_alpha(alpha);
-        sprite.custom_size = Some(size);
-        transform.scale = Vec3::ONE; // size is managed via custom_size, not scale
+/// Syncs local-flash size and colour to `Sprite` (fallback / headless mode).
+pub fn sync_local_flash_sprite(
+    mut flashes: Query<
+        (&LocalFlashAnimation, &mut Sprite, &mut Transform),
+        Without<MeshMaterial2d<RadialGradientMaterial>>,
+    >,
+) {
+    for (flash, mut sprite, mut transform) in flashes.iter_mut() {
+        sprite.color = flash.color.with_alpha(flash.current_alpha);
+        sprite.custom_size = Some(flash.current_size);
+        // Size is managed via custom_size; keep scale neutral.
+        transform.scale = Vec3::ONE;
+    }
+}
+
+/// Syncs local-flash size and colour to [`RadialGradientMaterial`] (shader mode).
+pub fn sync_local_flash_material(
+    mut flashes: Query<
+        (
+            &LocalFlashAnimation,
+            &mut Transform,
+            &MeshMaterial2d<RadialGradientMaterial>,
+        ),
+        Without<Sprite>,
+    >,
+    mut materials: Option<ResMut<Assets<RadialGradientMaterial>>>,
+) {
+    let Some(ref mut mats) = materials else {
+        return;
+    };
+    for (flash, mut transform, handle) in flashes.iter_mut() {
+        // Size via Transform scale (material always fills the quad).
+        transform.scale = Vec3::new(flash.current_size.x, flash.current_size.y, 1.0);
+        if let Some(mat) = mats.get_mut(&handle.0) {
+            let linear = flash.color.to_linear();
+            mat.color = LinearRgba {
+                alpha: flash.current_alpha,
+                ..linear
+            };
+        }
     }
 }
 
@@ -233,6 +301,8 @@ mod tests {
             duration: LOCAL_FLASH_DURATION,
             initial_size: Vec2::splat(50.0),
             color: Color::WHITE,
+            current_size: Vec2::ZERO,
+            current_alpha: 0.0,
         };
         let progress = (flash.elapsed / flash.duration).clamp(0.0, 1.0);
         let alpha = LOCAL_FLASH_INITIAL_ALPHA * (1.0 - progress);
@@ -306,6 +376,8 @@ mod tests {
             duration: LOCAL_FLASH_DURATION,
             initial_size: Vec2::splat(50.0),
             color: Color::WHITE,
+            current_size: Vec2::ZERO,
+            current_alpha: 0.0,
         };
 
         let entity = app

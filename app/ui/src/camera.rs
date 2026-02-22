@@ -15,9 +15,13 @@ use suika_game_core::prelude::CameraShake;
 ///
 /// A [`CameraShake`] component is attached so that the core shake system can
 /// apply trauma-based offsets to this camera when fruits merge.
+///
+/// Bloom support: the [`bevy::post_process::bloom::Bloom`] component is added
+/// and removed dynamically by the postprocess system based on [`CurrentWeather`].
 pub fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera2d,
+        Camera::default(),
         Transform::from_xyz(0.0, 0.0, 999.9),
         Projection::Orthographic(OrthographicProjection {
             scale: 1.0,

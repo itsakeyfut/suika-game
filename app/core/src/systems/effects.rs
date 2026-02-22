@@ -5,9 +5,14 @@
 //! and flash effects for merges and landings.
 
 pub mod bounce;
+pub mod cloud_effect;
 pub mod droplet;
 pub mod flash;
+pub mod postprocess;
+pub mod rain;
+pub mod screen_droplet;
 pub mod shake;
+pub mod sun;
 pub mod watermelon;
 
 use bevy::prelude::*;
