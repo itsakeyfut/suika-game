@@ -4,6 +4,8 @@
 //! including score tracking, combo system, game over detection,
 //! next fruit preview, and user settings.
 
+use bevy::prelude::*;
+
 pub mod combo;
 pub mod game;
 pub mod game_over;
@@ -15,6 +17,16 @@ pub use game::GameState;
 pub use game_over::GameOverTimer;
 pub use settings::{Language, SettingsResource};
 pub use spawn::NextFruitType;
+
+/// Shared white circle texture used as placeholder for fruit sprites.
+///
+/// At startup a 128×128 white disc on a transparent background is generated
+/// and stored here. `Sprite::color` tints it to the per-fruit colour.
+///
+/// When real pixel-art assets are loaded, swap `Sprite::image` for the
+/// actual asset handle and reset `Sprite::color` to `Color::WHITE`.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct CircleTexture(pub Handle<Image>);
 
 #[cfg(test)]
 mod tests {

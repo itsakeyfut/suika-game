@@ -10,7 +10,7 @@ use crate::config::{
     FruitsConfig, FruitsConfigHandle, GameRulesConfig, GameRulesConfigHandle, PhysicsConfig,
     PhysicsConfigHandle,
 };
-use crate::resources::NextFruitType;
+use crate::resources::{CircleTexture, NextFruitType};
 
 /// Sets up the next fruit preview display
 ///
@@ -39,6 +39,7 @@ pub fn setup_fruit_preview(
     physics_config_assets: Res<Assets<PhysicsConfig>>,
     game_rules_handle: Res<GameRulesConfigHandle>,
     game_rules_assets: Res<Assets<GameRulesConfig>>,
+    circle_texture: Res<CircleTexture>,
 ) {
     // Get the configs
     let radius = if let Some(config) = fruits_config_assets.get(&fruits_config_handle.0) {
@@ -85,6 +86,7 @@ pub fn setup_fruit_preview(
     commands.spawn((
         NextFruitPreview,
         Sprite {
+            image: circle_texture.0.clone(),
             color: next_fruit.get().placeholder_color(),
             custom_size: Some(Vec2::splat(radius * 2.0 * preview_scale)),
             ..default()
@@ -176,6 +178,7 @@ pub fn update_fruit_preview(
 mod tests {
     use super::*;
     use crate::config::*;
+    use crate::resources::CircleTexture;
     use bevy::asset::Assets;
 
     /// Helper to setup test app with required resources
@@ -315,6 +318,7 @@ mod tests {
         app.insert_resource(game_rules_assets);
         app.insert_resource(GameRulesConfigHandle(game_rules_handle));
         app.init_resource::<NextFruitType>();
+        app.insert_resource(CircleTexture(Handle::default()));
 
         app
     }

@@ -67,7 +67,9 @@ pub mod prelude {
 
     // Resources
     pub use crate::resources::settings::{Language, SettingsResource};
-    pub use crate::resources::{ComboTimer, GameOverTimer, GameState, NextFruitType};
+    pub use crate::resources::{
+        CircleTexture, ComboTimer, GameOverTimer, GameState, NextFruitType,
+    };
     pub use crate::systems::input::{InputMode, LastCursorPosition, SpawnPosition};
 
     // States
@@ -167,6 +169,12 @@ impl Plugin for GameCorePlugin {
             .init_resource::<systems::input::SpawnPosition>()
             .init_resource::<systems::input::InputMode>()
             .init_resource::<systems::input::LastCursorPosition>();
+
+        // Register CircleTexture immediately (default = invalid handle) so any
+        // Startup system can safely declare Res<CircleTexture> without ordering
+        // constraints.  setup_circle_texture then fills in the real texture.
+        app.init_resource::<resources::CircleTexture>();
+        app.add_systems(Startup, systems::spawn::setup_circle_texture);
 
         // Load persisted data into resources at startup
         app.add_systems(
@@ -340,7 +348,9 @@ mod tests {
         // MinimalPlugins + StatesPlugin are required for GameCorePlugin
         // (StatesPlugin is needed for init_state, included in DefaultPlugins but not MinimalPlugins)
         app.add_plugins(MinimalPlugins)
-            .add_plugins(bevy::state::app::StatesPlugin);
+            .add_plugins(bevy::state::app::StatesPlugin)
+            // AssetPlugin required by setup_circle_texture (ResMut<Assets<Image>>)
+            .add_plugins(bevy::asset::AssetPlugin::default());
         app.add_plugins(GameCorePlugin);
         // Plugin should build without panicking
     }
