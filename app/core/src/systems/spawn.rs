@@ -20,7 +20,7 @@ use crate::resources::CircleTexture;
 /// this texture with `Sprite::color` to achieve their individual colours.
 ///
 /// Run this system once at `Startup` (before any fruit is spawned).
-pub fn setup_circle_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+pub fn setup_circle_texture(mut circle_texture: ResMut<CircleTexture>, mut images: ResMut<Assets<Image>>) {
     const DIAMETER: u32 = 128;
     const RADIUS: f32 = 64.0;
 
@@ -53,8 +53,7 @@ pub fn setup_circle_texture(mut commands: Commands, mut images: ResMut<Assets<Im
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD,
     );
-    let handle = images.add(image);
-    commands.insert_resource(CircleTexture(handle));
+    circle_texture.0 = images.add(image);
 }
 
 /// Spawns a fruit entity at the specified position

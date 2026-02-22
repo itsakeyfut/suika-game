@@ -170,7 +170,10 @@ impl Plugin for GameCorePlugin {
             .init_resource::<systems::input::InputMode>()
             .init_resource::<systems::input::LastCursorPosition>();
 
-        // Generate the circular placeholder texture used by fruit sprites
+        // Register CircleTexture immediately (default = invalid handle) so any
+        // Startup system can safely declare Res<CircleTexture> without ordering
+        // constraints.  setup_circle_texture then fills in the real texture.
+        app.init_resource::<resources::CircleTexture>();
         app.add_systems(Startup, systems::spawn::setup_circle_texture);
 
         // Load persisted data into resources at startup
