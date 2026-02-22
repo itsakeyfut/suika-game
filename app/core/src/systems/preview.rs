@@ -292,6 +292,7 @@ mod tests {
             wall_restitution: 0.2,
             wall_friction: 0.5,
             fruit_spawn_y_offset: 50.0,
+            fruit_spawn_x_offset: 0.0,
             fruit_linear_damping: 0.5,
             fruit_angular_damping: 1.0,
             keyboard_move_speed: 300.0,

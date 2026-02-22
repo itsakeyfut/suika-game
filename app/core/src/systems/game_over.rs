@@ -45,6 +45,7 @@ use crate::components::Fruit;
 use crate::constants::storage::SAVE_DIR;
 use crate::persistence::{HighscoreData, save_highscore};
 use crate::resources::{ComboTimer, GameOverTimer, GameState};
+use crate::systems::input::{InputMode, SpawnPosition};
 
 // ---------------------------------------------------------------------------
 // Systems
@@ -99,6 +100,8 @@ pub fn reset_game_state(
     mut game_state: ResMut<GameState>,
     mut combo_timer: ResMut<ComboTimer>,
     mut game_over_timer: ResMut<GameOverTimer>,
+    mut input_mode: ResMut<InputMode>,
+    mut spawn_pos: ResMut<SpawnPosition>,
     fruit_query: Query<Entity, With<Fruit>>,
 ) {
     let highscore = game_state.highscore;
@@ -111,6 +114,10 @@ pub fn reset_game_state(
     };
     combo_timer.reset_session();
     game_over_timer.reset_session();
+
+    // Reset input state so the held fruit always starts at the container center
+    *input_mode = InputMode::Keyboard;
+    *spawn_pos = SpawnPosition::default();
 
     let mut despawned = 0u32;
     for entity in fruit_query.iter() {

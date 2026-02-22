@@ -11,7 +11,8 @@
 // - boundary_line_y: Y position of game over line (from bottom)
 // - wall_restitution: Bounciness of walls (0.0 = no bounce, 1.0 = perfect bounce)
 // - wall_friction: Surface friction of walls (0.0 = ice, 1.0 = rubber)
-// - fruit_spawn_y_offset: Distance from top to spawn held fruit
+// - fruit_spawn_y_offset: Distance (px) from container top to held fruit center (increase = lower)
+// - fruit_spawn_x_offset: Initial X offset from container center for first fruit (0.0 = center)
 // - fruit_linear_damping: Reduces fruit linear velocity over time
 // - fruit_angular_damping: Reduces fruit rotation over time
 // - move_speed: Keyboard movement speed in pixels/second
@@ -32,8 +33,9 @@ PhysicsConfig(
     wall_restitution: 0.2,
     wall_friction: 0.5,
 
-    // Fruit spawning
-    fruit_spawn_y_offset: 50.0,
+    // Fruit spawning (tweak these to adjust the start position)
+    fruit_spawn_y_offset: 0.0,   // distance from container top; increase to move fruit lower
+    fruit_spawn_x_offset: 0.0,    // horizontal offset from center; positive = right
 
     // Fruit physics damping
     fruit_linear_damping: 0.5,

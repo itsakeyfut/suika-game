@@ -12,7 +12,9 @@ use bevy_rapier2d::prelude::{
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::components::{BottomWall, BoundaryLine, Container, Fruit, LeftWall, NextFruitPreview};
+use crate::components::{
+    BottomWall, BoundaryLine, Container, Fruit, FruitSpawnState, LeftWall, NextFruitPreview,
+};
 
 // ---------------------------------------------------------------------------
 // Shared color type
@@ -94,6 +96,8 @@ pub struct PhysicsConfig {
     pub wall_friction: f32,
     /// Distance from top of container to spawn held fruit
     pub fruit_spawn_y_offset: f32,
+    /// Initial X offset for fruit spawn relative to container center (0.0 = center)
+    pub fruit_spawn_x_offset: f32,
     /// Linear damping for fruit physics (reduces velocity over time)
     pub fruit_linear_damping: f32,
     /// Angular damping for fruit physics (reduces rotation over time)
@@ -402,8 +406,13 @@ pub fn hot_reload_physics_config(
         &mut Transform,
         (With<BoundaryLine>, Without<Container>, Without<Fruit>),
     >,
-    fruits_query: Query<
-        (Entity, &Transform, &crate::fruit::FruitType),
+    mut fruits_query: Query<
+        (
+            Entity,
+            &mut Transform,
+            &crate::fruit::FruitType,
+            Option<&FruitSpawnState>,
+        ),
         (With<Fruit>, Without<Container>, Without<BoundaryLine>),
     >,
     fruits: FruitsParams,
@@ -451,9 +460,11 @@ pub fn hot_reload_physics_config(
                         config.gravity, config.container_width, config.container_height
                     );
 
-                    // CRITICAL: Delete out-of-bounds fruits BEFORE updating walls
+                    // CRITICAL: Delete out-of-bounds fruits BEFORE updating walls,
+                    // and update held fruit spawn position to match new config values.
+                    let new_spawn_y = config.container_height / 2.0 - config.fruit_spawn_y_offset;
                     let mut deleted_count = 0;
-                    for (entity, transform, fruit_type) in fruits_query.iter() {
+                    for (entity, mut transform, fruit_type, state) in fruits_query.iter_mut() {
                         let radius = if let Some(fruits_config) = fruits.get() {
                             fruit_type
                                 .try_parameters_from_config(fruits_config)
@@ -473,6 +484,9 @@ pub fn hot_reload_physics_config(
                                 transform.translation.y,
                                 radius
                             );
+                        } else if state.is_some_and(|s| *s == FruitSpawnState::Held) {
+                            transform.translation.y = new_spawn_y;
+                            info!("🎯 Hot-reload: held fruit Y updated to {:.1}", new_spawn_y);
                         }
                     }
                     if deleted_count > 0 {
@@ -613,6 +627,7 @@ PhysicsConfig(
     wall_restitution: 0.2,
     wall_friction: 0.5,
     fruit_spawn_y_offset: 50.0,
+    fruit_spawn_x_offset: 0.0,
     fruit_linear_damping: 0.5,
     fruit_angular_damping: 1.0,
     keyboard_move_speed: 300.0,
@@ -678,6 +693,7 @@ GameRulesConfig(
             wall_restitution: 0.2,
             wall_friction: 0.5,
             fruit_spawn_y_offset: 50.0,
+            fruit_spawn_x_offset: 0.0,
             fruit_linear_damping: 0.5,
             fruit_angular_damping: 1.0,
             keyboard_move_speed: 300.0,

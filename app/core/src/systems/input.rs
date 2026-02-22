@@ -58,9 +58,11 @@ impl Default for SpawnPosition {
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InputMode {
     /// Player is using keyboard (arrow keys or A/D)
+    /// Default so the held fruit starts at the container center (spawn_pos.x = 0)
+    /// and only follows the mouse after the user actually moves the cursor.
+    #[default]
     Keyboard,
     /// Player is using mouse cursor
-    #[default]
     Mouse,
 }
 
@@ -94,7 +96,7 @@ pub struct LastCursorPosition {
 pub fn spawn_held_fruit(
     mut commands: Commands,
     mut next_fruit: ResMut<NextFruitType>,
-    spawn_pos: Res<SpawnPosition>,
+    mut spawn_pos: ResMut<SpawnPosition>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
     fruits_config_handle: Res<FruitsConfigHandle>,
     fruits_config_assets: Res<Assets<FruitsConfig>>,
@@ -143,6 +145,14 @@ pub fn spawn_held_fruit(
     // 1. No fruit in Held state
     // 2. No fruit in Falling state (wait for it to land first)
     if held_count == 0 && falling_count == 0 {
+        // On the very first spawn (nothing exists yet), initialize X from config
+        if held_count == 0 && falling_count == 0 && landed_count == 0 {
+            spawn_pos.x = physics_config
+                .fruit_spawn_x_offset
+                .max(-physics_config.container_width / 2.0)
+                .min(physics_config.container_width / 2.0);
+        }
+
         let spawn_y = physics_config.container_height / 2.0 - physics_config.fruit_spawn_y_offset;
         let params = next_fruit.get().parameters_from_config(fruits_config);
 
@@ -562,6 +572,7 @@ mod tests {
             wall_restitution: 0.2,
             wall_friction: 0.5,
             fruit_spawn_y_offset: 50.0,
+            fruit_spawn_x_offset: 0.0,
             fruit_linear_damping: 0.5,
             fruit_angular_damping: 1.0,
             keyboard_move_speed: 300.0,
