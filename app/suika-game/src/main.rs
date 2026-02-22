@@ -20,6 +20,9 @@ fn main() {
             ..default()
         }))
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        // ShadersPlugin must come before GameCorePlugin so that Material2d
+        // types are registered before any systems try to access their assets.
+        .add_plugins(ShadersPlugin)
         .add_plugins(GameAssetsPlugin)
         .add_plugins(GameConfigPlugin)
         .add_plugins(GameCorePlugin)

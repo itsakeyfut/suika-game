@@ -3,6 +3,10 @@
 //! Spawns small water-drop particles on fruit merge and fruit landing.
 //! Droplets are affected by gravity and bounce off the container walls,
 //! fading out before they despawn.
+//!
+//! When [`crate::shaders::ShadersPlugin`] is loaded the particles are rendered
+//! through [`crate::shaders::SoftCircleMaterial`] (SDF soft-circle shader).
+//! In headless / test contexts the fallback plain-`Sprite` path is used.
 
 use bevy::prelude::*;
 use rand::RngExt;
@@ -10,6 +14,7 @@ use rand::RngExt;
 use crate::components::{Fruit, FruitSpawnState};
 use crate::config::{BounceParams, DropletColorMode, DropletConfig, DropletParams, PhysicsParams};
 use crate::events::FruitMergeEvent;
+use crate::shaders::{SoftCircleMaterial, UnitQuadMesh};
 use crate::systems::effects::bounce::SquashStretchAnimation;
 
 // --- Constants ---
@@ -34,13 +39,15 @@ pub const DROPLET_GRAVITY: f32 = -600.0;
 pub const DROPLET_BOUNCE_DAMPING: f32 = 0.55;
 /// Base color of water droplets
 pub const DROPLET_COLOR: Color = Color::srgba(0.5, 0.78, 0.95, 0.85);
+/// Starting alpha for droplets
+pub const DROPLET_INITIAL_ALPHA: f32 = 0.85;
 
 // --- Component ---
 
 /// Water droplet particle component
 ///
-/// A short-lived sprite that flies out from merge/landing points,
-/// bounces off the container walls, and fades out over its lifetime.
+/// A short-lived sprite / soft-circle mesh that flies out from merge/landing
+/// points, bounces off the container walls, and fades out over its lifetime.
 #[derive(Component, Debug)]
 pub struct WaterDroplet {
     /// Current velocity in pixels/second
@@ -49,6 +56,8 @@ pub struct WaterDroplet {
     pub lifetime: f32,
     /// Total lifetime in seconds before despawn
     pub max_lifetime: f32,
+    /// Current alpha value (updated each frame, applied to Sprite or Material).
+    pub alpha: f32,
 }
 
 // --- Internal helpers ---
@@ -89,14 +98,18 @@ fn resolve_droplet_color(config: Option<&DropletConfig>, fruit_color: Color) -> 
     }
 }
 
-/// Spawns `count` droplets radiating from `position` using values from `config`
-/// (or falling back to the module constants when `config` is `None`).
+/// Spawns `count` droplets radiating from `position`.
+///
+/// Uses [`SoftCircleMaterial`] when shader assets are available, otherwise
+/// falls back to plain [`Sprite`] (headless / test mode).
 fn spawn_droplets(
     commands: &mut Commands,
     position: Vec2,
     color: Color,
     count: u32,
     config: Option<&DropletConfig>,
+    unit_quad: Option<&UnitQuadMesh>,
+    materials: &mut Option<ResMut<Assets<SoftCircleMaterial>>>,
 ) {
     let radius = config.map(|c| c.radius).unwrap_or(DROPLET_RADIUS);
     let min_speed = config.map(|c| c.min_speed).unwrap_or(DROPLET_MIN_SPEED);
@@ -128,6 +141,9 @@ fn spawn_droplets(
         lifetime_min + 0.01
     };
 
+    let size = radius * 2.0;
+    let linear_color = color.to_linear();
+
     let mut rng = rand::rng();
     for _ in 0..count {
         let angle = rng.random_range(0.0_f32..std::f32::consts::TAU);
@@ -135,21 +151,39 @@ fn spawn_droplets(
         let velocity = Vec2::new(angle.cos() * speed, angle.sin() * speed);
         let lifetime = rng.random_range(lifetime_min..lt_max);
 
-        commands.spawn((
-            WaterDroplet {
-                velocity,
-                lifetime: 0.0,
-                max_lifetime: lifetime,
-            },
-            // TODO: 将来的に Material2d + WGSL フラグメントシェーダーで
-            //       ソフトな円形（エッジをブラー）に変更する
-            Sprite {
-                color,
-                custom_size: Some(Vec2::splat(radius * 2.0)),
-                ..default()
-            },
-            Transform::from_translation(position.extend(5.0)),
-        ));
+        let droplet = WaterDroplet {
+            velocity,
+            lifetime: 0.0,
+            max_lifetime: lifetime,
+            alpha: DROPLET_INITIAL_ALPHA,
+        };
+
+        match (unit_quad, materials.as_mut()) {
+            (Some(quad), Some(mats)) => {
+                // Shader path: soft-circle Material2d
+                let mat = mats.add(SoftCircleMaterial {
+                    color: linear_color,
+                });
+                commands.spawn((
+                    droplet,
+                    Mesh2d(quad.0.clone()),
+                    MeshMaterial2d(mat),
+                    Transform::from_translation(position.extend(5.0)).with_scale(Vec3::splat(size)),
+                ));
+            }
+            _ => {
+                // Sprite fallback (headless / test contexts)
+                commands.spawn((
+                    droplet,
+                    Sprite {
+                        color,
+                        custom_size: Some(Vec2::splat(size)),
+                        ..default()
+                    },
+                    Transform::from_translation(position.extend(5.0)),
+                ));
+            }
+        }
     }
 }
 
@@ -165,6 +199,8 @@ pub fn spawn_merge_droplets(
     mut commands: Commands,
     mut merge_events: MessageReader<FruitMergeEvent>,
     droplet: DropletParams<'_>,
+    unit_quad: Option<Res<UnitQuadMesh>>,
+    mut soft_circle_materials: Option<ResMut<Assets<SoftCircleMaterial>>>,
 ) {
     let config = droplet.get();
     let base_count = config.map(|c| c.count_merge).unwrap_or(DROPLET_COUNT_MERGE);
@@ -173,7 +209,15 @@ pub fn spawn_merge_droplets(
         let count = scale_count_by_fruit(base_count, event.fruit_type);
         let fruit_color = event.fruit_type.placeholder_color();
         let color = resolve_droplet_color(config, fruit_color);
-        spawn_droplets(&mut commands, event.position, color, count, config);
+        spawn_droplets(
+            &mut commands,
+            event.position,
+            color,
+            count,
+            config,
+            unit_quad.as_deref(),
+            &mut soft_circle_materials,
+        );
     }
 }
 
@@ -197,6 +241,8 @@ pub fn handle_fruit_landing(
     >,
     droplet: DropletParams<'_>,
     bounce: BounceParams<'_>,
+    unit_quad: Option<Res<UnitQuadMesh>>,
+    mut soft_circle_materials: Option<ResMut<Assets<SoftCircleMaterial>>>,
 ) {
     let droplet_cfg = droplet.get();
     let bounce_cfg = bounce.get();
@@ -213,7 +259,15 @@ pub fn handle_fruit_landing(
         let pos = transform.translation.truncate();
         let fruit_color = fruit_type.placeholder_color();
         let color = resolve_droplet_color(droplet_cfg, fruit_color);
-        spawn_droplets(&mut commands, pos, color, count, droplet_cfg);
+        spawn_droplets(
+            &mut commands,
+            pos,
+            color,
+            count,
+            droplet_cfg,
+            unit_quad.as_deref(),
+            &mut soft_circle_materials,
+        );
 
         // Add landing bounce (squash-and-stretch) to the fruit
         commands
@@ -227,11 +281,15 @@ pub fn handle_fruit_landing(
 /// Each frame:
 /// 1. Integrates velocity (with gravity) into position
 /// 2. Bounces off container walls (X bounds and Y floor)
-/// 3. Fades out the sprite alpha over the droplet's lifetime
+/// 3. Fades out the `WaterDroplet::alpha` over the droplet's lifetime
 /// 4. Despawns droplets whose lifetime has expired
+///
+/// Separate sync systems ([`sync_sprite_droplet_alpha`],
+/// [`sync_material_droplet_alpha`]) apply the computed alpha to the visual
+/// representation.
 pub fn update_water_droplets(
     mut commands: Commands,
-    mut droplets: Query<(Entity, &mut WaterDroplet, &mut Transform, &mut Sprite)>,
+    mut droplets: Query<(Entity, &mut WaterDroplet, &mut Transform)>,
     time: Res<Time>,
     physics: PhysicsParams<'_>,
     droplet: DropletParams<'_>,
@@ -249,7 +307,7 @@ pub fn update_water_droplets(
         .map(|c| c.bounce_damping)
         .unwrap_or(DROPLET_BOUNCE_DAMPING);
 
-    for (entity, mut droplet, mut transform, mut sprite) in droplets.iter_mut() {
+    for (entity, mut droplet, mut transform) in droplets.iter_mut() {
         // --- Physics integration ---
         droplet.velocity.y += gravity * dt;
         transform.translation.x += droplet.velocity.x * dt;
@@ -271,19 +329,40 @@ pub fn update_water_droplets(
 
         // --- Alpha fade ---
         droplet.lifetime += dt;
-        // Guard against NaN when max_lifetime is zero (should not happen in practice,
-        // but defensively avoid 0.0 / 0.0 which clamp() does not sanitize in Rust).
         let progress = if droplet.max_lifetime <= 0.0 {
             1.0
         } else {
             (droplet.lifetime / droplet.max_lifetime).clamp(0.0, 1.0)
         };
-        let alpha = (1.0 - progress) * 0.85;
-        sprite.color = sprite.color.with_alpha(alpha);
+        droplet.alpha = (1.0 - progress) * DROPLET_INITIAL_ALPHA;
 
         // --- Despawn when lifetime expires ---
         if droplet.lifetime >= droplet.max_lifetime {
             commands.entity(entity).despawn();
+        }
+    }
+}
+
+/// Syncs `WaterDroplet::alpha` to the `Sprite` colour (fallback / headless mode).
+pub fn sync_sprite_droplet_alpha(
+    mut droplets: Query<(&WaterDroplet, &mut Sprite), Without<MeshMaterial2d<SoftCircleMaterial>>>,
+) {
+    for (droplet, mut sprite) in droplets.iter_mut() {
+        sprite.color = sprite.color.with_alpha(droplet.alpha);
+    }
+}
+
+/// Syncs `WaterDroplet::alpha` to [`SoftCircleMaterial`] (shader mode).
+pub fn sync_material_droplet_alpha(
+    droplets: Query<(&WaterDroplet, &MeshMaterial2d<SoftCircleMaterial>)>,
+    mut materials: Option<ResMut<Assets<SoftCircleMaterial>>>,
+) {
+    let Some(ref mut mats) = materials else {
+        return;
+    };
+    for (droplet, handle) in droplets.iter() {
+        if let Some(mat) = mats.get_mut(&handle.0) {
+            mat.color.alpha = droplet.alpha;
         }
     }
 }

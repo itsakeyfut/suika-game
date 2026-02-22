@@ -9,6 +9,8 @@
 //! - Entity components (Fruit, Container, BoundaryLine, etc.)
 //! - Game constants (physics, scoring, timing)
 //! - Highscore persistence (JSON-based save/load)
+//! - Weather system (Sunny / Rainy / Cloudy per session)
+//! - Visual effects (droplets, flash, rain, screen droplets, weather overlay)
 //!
 //! ## Usage
 //!
@@ -34,6 +36,7 @@
 //! - [`fruit`]: Fruit type definitions and parameters
 //! - [`persistence`]: Highscore save/load functionality
 //! - [`resources`]: Bevy resources for game state
+//! - [`shaders`]: WGSL material types and [`shaders::ShadersPlugin`]
 //! - [`states`]: Application state definitions
 
 use bevy::prelude::*;
@@ -46,6 +49,7 @@ pub mod events;
 pub mod fruit;
 pub mod persistence;
 pub mod resources;
+pub mod shaders;
 pub mod states;
 pub mod systems;
 
@@ -67,6 +71,7 @@ pub mod prelude {
 
     // Resources
     pub use crate::resources::settings::{Language, SettingsResource};
+    pub use crate::resources::weather::{CurrentWeather, WeatherParams, WeatherState};
     pub use crate::resources::{ComboTimer, GameOverTimer, GameState, NextFruitType};
     pub use crate::systems::input::{InputMode, LastCursorPosition, SpawnPosition};
 
@@ -112,10 +117,24 @@ pub mod prelude {
     pub use crate::systems::effects::bounce::SquashStretchAnimation;
     pub use crate::systems::effects::droplet::WaterDroplet;
     pub use crate::systems::effects::flash::{LocalFlashAnimation, ScreenFlashAnimation};
+    pub use crate::systems::effects::postprocess::WeatherOverlay;
+    pub use crate::systems::effects::rain::RainDrop;
+    pub use crate::systems::effects::screen_droplet::{ScreenDroplet, ScreenDropletSpawnTimer};
     pub use crate::systems::effects::shake::CameraShake;
     pub use crate::systems::effects::watermelon::{
         WatermelonBurstParticle, WatermelonExplosionRing,
     };
+
+    // Shaders
+    pub use crate::shaders::{
+        CloudMaterial, FullScreenQuadMesh, RadialGradientMaterial, RainDropMaterial,
+        ScreenDropletMaterial, ShadersPlugin, SoftCircleMaterial, SunMaterial, UnitQuadMesh,
+        WeatherPostprocessMaterial,
+    };
+
+    // Sun / cloud effects
+    pub use crate::systems::effects::cloud_effect::CloudPuff;
+    pub use crate::systems::effects::sun::SunEffect;
 
     // Plugin
     pub use crate::GameCorePlugin;
@@ -125,30 +144,6 @@ pub mod prelude {
 ///
 /// This plugin initializes the core game systems and registers
 /// all necessary resources and states with the Bevy app.
-///
-/// # What it does
-///
-/// Currently, this plugin serves as a placeholder for future system registration.
-/// In upcoming phases, it will:
-/// - Initialize application state (`AppState`)
-/// - Register game resources (`GameState`, `ComboTimer`, etc.)
-/// - Set up physics systems
-/// - Configure collision detection
-/// - Register game logic systems
-///
-/// # Example
-///
-/// ```no_run
-/// use bevy::prelude::*;
-/// use suika_game_core::GameCorePlugin;
-///
-/// fn main() {
-///     App::new()
-///         .add_plugins(DefaultPlugins)
-///         .add_plugins(GameCorePlugin)
-///         .run();
-/// }
-/// ```
 pub struct GameCorePlugin;
 
 impl Plugin for GameCorePlugin {
@@ -164,9 +159,11 @@ impl Plugin for GameCorePlugin {
             .init_resource::<resources::GameOverTimer>()
             .init_resource::<resources::NextFruitType>()
             .init_resource::<resources::SettingsResource>()
+            .init_resource::<resources::weather::CurrentWeather>()
             .init_resource::<systems::input::SpawnPosition>()
             .init_resource::<systems::input::InputMode>()
-            .init_resource::<systems::input::LastCursorPosition>();
+            .init_resource::<systems::input::LastCursorPosition>()
+            .init_resource::<systems::effects::screen_droplet::ScreenDropletSpawnTimer>();
 
         // Load persisted data into resources at startup
         app.add_systems(
@@ -222,27 +219,58 @@ impl Plugin for GameCorePlugin {
                 .run_if(in_state(states::AppState::Playing)),
         );
 
-        // Particle / flash / shake effects — gated on both Playing AND effects_enabled.
+        // Particle / flash / shake / screen effects — gated on both Playing AND
+        // effects_enabled.  Split across multiple add_systems calls to stay
+        // within Bevy's system-tuple arity limit.
+
+        // Water droplet + flash (10 systems)
         app.add_systems(
             Update,
             (
-                // Water droplet particles
                 systems::effects::droplet::spawn_merge_droplets
                     .after(systems::merge::handle_fruit_merge),
                 systems::effects::droplet::handle_fruit_landing,
                 systems::effects::droplet::update_water_droplets,
-                // Flash effects
+                systems::effects::droplet::sync_sprite_droplet_alpha,
+                systems::effects::droplet::sync_material_droplet_alpha,
                 systems::effects::flash::spawn_merge_flash
                     .after(systems::merge::handle_fruit_merge),
                 systems::effects::flash::animate_local_flash,
+                systems::effects::flash::sync_local_flash_sprite,
+                systems::effects::flash::sync_local_flash_material,
                 systems::effects::flash::animate_screen_flash,
-                // Camera shake — trauma accumulates on merge (Playing only)
+            )
+                .run_if(in_state(states::AppState::Playing))
+                .run_if(|settings: Res<resources::SettingsResource>| settings.effects_enabled),
+        );
+
+        // Shake + watermelon special effects (4 systems)
+        app.add_systems(
+            Update,
+            (
                 systems::effects::shake::add_camera_shake.after(systems::merge::handle_fruit_merge),
-                // Watermelon special effects
                 systems::effects::watermelon::spawn_watermelon_effects
                     .after(systems::merge::handle_fruit_merge),
                 systems::effects::watermelon::animate_watermelon_explosion,
                 systems::effects::watermelon::update_watermelon_burst_particles,
+            )
+                .run_if(in_state(states::AppState::Playing))
+                .run_if(|settings: Res<resources::SettingsResource>| settings.effects_enabled),
+        );
+
+        // Rain + screen droplets (8 systems)
+        app.add_systems(
+            Update,
+            (
+                systems::effects::rain::spawn_rain,
+                systems::effects::rain::update_rain,
+                systems::effects::rain::cleanup_rain_on_weather_change,
+                systems::effects::screen_droplet::spawn_screen_droplets_on_merge
+                    .after(systems::merge::handle_fruit_merge),
+                systems::effects::screen_droplet::spawn_screen_droplets_rain,
+                systems::effects::screen_droplet::update_screen_droplets,
+                systems::effects::screen_droplet::sync_screen_droplet_sprite_alpha,
+                systems::effects::screen_droplet::sync_screen_droplet_material_alpha,
             )
                 .run_if(in_state(states::AppState::Playing))
                 .run_if(|settings: Res<resources::SettingsResource>| settings.effects_enabled),
@@ -327,6 +355,58 @@ impl Plugin for GameCorePlugin {
             )
                 .run_if(in_state(states::AppState::Playing)),
         );
+
+        // Weather: randomise each new session
+        app.add_systems(
+            OnEnter(states::AppState::Playing),
+            resources::weather::randomize_weather,
+        );
+
+        // Weather postprocess overlay: spawn on session start, despawn on exit
+        app.add_systems(
+            OnEnter(states::AppState::Playing),
+            (
+                systems::effects::postprocess::setup_weather_overlay,
+                systems::effects::postprocess::apply_weather_bloom,
+            ),
+        );
+        app.add_systems(
+            OnExit(states::AppState::Playing),
+            (
+                systems::effects::postprocess::despawn_weather_overlay,
+                systems::effects::postprocess::remove_weather_bloom,
+            ),
+        );
+
+        // Sun effect (Sunny weather): spawn on entry, animate each frame, despawn on exit.
+        // These are ambient background elements — not gated on effects_enabled.
+        app.add_systems(
+            OnEnter(states::AppState::Playing),
+            systems::effects::sun::setup_sun,
+        );
+        app.add_systems(
+            Update,
+            systems::effects::sun::animate_sun.run_if(in_state(states::AppState::Playing)),
+        );
+        app.add_systems(
+            OnExit(states::AppState::Playing),
+            systems::effects::sun::despawn_sun,
+        );
+
+        // Cloud puff effect (Cloudy weather): spawn on entry, drift each frame, despawn on exit.
+        app.add_systems(
+            OnEnter(states::AppState::Playing),
+            systems::effects::cloud_effect::setup_cloud_puffs,
+        );
+        app.add_systems(
+            Update,
+            systems::effects::cloud_effect::update_cloud_puffs
+                .run_if(in_state(states::AppState::Playing)),
+        );
+        app.add_systems(
+            OnExit(states::AppState::Playing),
+            systems::effects::cloud_effect::despawn_cloud_puffs,
+        );
     }
 }
 
@@ -354,5 +434,6 @@ mod tests {
         let _state = AppState::default();
         let _fruit_type = FruitType::Cherry;
         let _game_state = GameState::default();
+        let _weather = CurrentWeather::default();
     }
 }
