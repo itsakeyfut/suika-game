@@ -25,7 +25,7 @@ pub use spawn::NextFruitType;
 ///
 /// When real pixel-art assets are loaded, swap `Sprite::image` for the
 /// actual asset handle and reset `Sprite::color` to `Color::WHITE`.
-#[derive(Resource, Clone, Default)]
+#[derive(Resource, Clone, Debug, Default)]
 pub struct CircleTexture(pub Handle<Image>);
 
 #[cfg(test)]

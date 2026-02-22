@@ -348,7 +348,9 @@ mod tests {
         // MinimalPlugins + StatesPlugin are required for GameCorePlugin
         // (StatesPlugin is needed for init_state, included in DefaultPlugins but not MinimalPlugins)
         app.add_plugins(MinimalPlugins)
-            .add_plugins(bevy::state::app::StatesPlugin);
+            .add_plugins(bevy::state::app::StatesPlugin)
+            // AssetPlugin required by setup_circle_texture (ResMut<Assets<Image>>)
+            .add_plugins(bevy::asset::AssetPlugin::default());
         app.add_plugins(GameCorePlugin);
         // Plugin should build without panicking
     }
