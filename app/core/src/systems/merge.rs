@@ -13,6 +13,7 @@ use bevy_rapier2d::prelude::ActiveEvents;
 use crate::components::FruitSpawnState;
 use crate::config::{BounceConfig, BounceConfigHandle, FruitsConfig, FruitsConfigHandle};
 use crate::events::FruitMergeEvent;
+use crate::resources::CircleTexture;
 use crate::systems::effects::bounce::SquashStretchAnimation;
 use crate::systems::spawn::spawn_fruit;
 
@@ -40,6 +41,7 @@ pub fn handle_fruit_merge(
     fruits_assets: Res<Assets<FruitsConfig>>,
     bounce_handle: Option<Res<BounceConfigHandle>>,
     bounce_assets: Option<Res<Assets<BounceConfig>>>,
+    circle_texture: Res<CircleTexture>,
 ) {
     let Some(fruits_config) = fruits_assets.get(&fruits_handle.0) else {
         // Drain events to prevent stale buffering
@@ -72,7 +74,13 @@ pub fn handle_fruit_merge(
 
         // Spawn next evolution, or just remove both if Watermelon (final stage)
         if let Some(next_type) = event.fruit_type.next() {
-            let entity = spawn_fruit(&mut commands, next_type, event.position, fruits_config);
+            let entity = spawn_fruit(
+                &mut commands,
+                next_type,
+                event.position,
+                fruits_config,
+                circle_texture.0.clone(),
+            );
 
             // Add components required for collision detection and the pop-in animation
             commands.entity(entity).insert((
@@ -103,6 +111,7 @@ mod tests {
     use crate::config::{FruitConfigEntry, FruitsConfig, FruitsConfigHandle};
     use crate::events::FruitMergeEvent;
     use crate::fruit::FruitType;
+    use crate::resources::CircleTexture;
     use crate::systems::spawn::spawn_fruit;
 
     fn create_test_config() -> FruitsConfig {
@@ -132,6 +141,7 @@ mod tests {
         let handle = fruits_assets.add(create_test_config());
         app.insert_resource(fruits_assets);
         app.insert_resource(FruitsConfigHandle(handle));
+        app.insert_resource(CircleTexture(Handle::default()));
 
         app
     }
@@ -140,7 +150,13 @@ mod tests {
     fn spawn_test_fruit(app: &mut App, fruit_type: FruitType) -> Entity {
         let config = create_test_config();
         let mut commands = app.world_mut().commands();
-        let entity = spawn_fruit(&mut commands, fruit_type, Vec2::ZERO, &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            fruit_type,
+            Vec2::ZERO,
+            &config,
+            Handle::default(),
+        );
         // Flush commands so entity exists before further operations
         app.update();
         entity

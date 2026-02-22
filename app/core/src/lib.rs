@@ -67,7 +67,9 @@ pub mod prelude {
 
     // Resources
     pub use crate::resources::settings::{Language, SettingsResource};
-    pub use crate::resources::{ComboTimer, GameOverTimer, GameState, NextFruitType};
+    pub use crate::resources::{
+        CircleTexture, ComboTimer, GameOverTimer, GameState, NextFruitType,
+    };
     pub use crate::systems::input::{InputMode, LastCursorPosition, SpawnPosition};
 
     // States
@@ -167,6 +169,9 @@ impl Plugin for GameCorePlugin {
             .init_resource::<systems::input::SpawnPosition>()
             .init_resource::<systems::input::InputMode>()
             .init_resource::<systems::input::LastCursorPosition>();
+
+        // Generate the circular placeholder texture used by fruit sprites
+        app.add_systems(Startup, systems::spawn::setup_circle_texture);
 
         // Load persisted data into resources at startup
         app.add_systems(

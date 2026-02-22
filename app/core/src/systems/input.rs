@@ -19,7 +19,7 @@ use crate::config::{
     PhysicsConfigHandle,
 };
 use crate::fruit::FruitType;
-use crate::resources::NextFruitType;
+use crate::resources::{CircleTexture, NextFruitType};
 
 // ---------------------------------------------------------------------------
 // Default values for RON-loaded parameters (fallbacks before configs are loaded)
@@ -102,6 +102,7 @@ pub fn spawn_held_fruit(
     physics_config_assets: Res<Assets<PhysicsConfig>>,
     rules_config_handle: Option<Res<GameRulesConfigHandle>>,
     rules_config_assets: Option<Res<Assets<GameRulesConfig>>>,
+    circle_texture: Res<CircleTexture>,
 ) {
     // Get the configs, return early if not loaded yet
     let Some(fruits_config) = fruits_config_assets.get(&fruits_config_handle.0) else {
@@ -150,8 +151,10 @@ pub fn spawn_held_fruit(
             Fruit,
             next_fruit.get(),
             FruitSpawnState::Held,
-            // Sprite rendering
+            // Circular placeholder sprite — tinted with the fruit colour.
+            // Swap `image` for a real asset handle when pixel-art sprites are ready.
             Sprite {
+                image: circle_texture.0.clone(),
                 color: next_fruit.get().placeholder_color(),
                 custom_size: Some(Vec2::splat(params.radius * 2.0)),
                 ..default()
@@ -426,6 +429,7 @@ pub fn update_spawn_position(
 mod tests {
     use super::*;
     use crate::config::*;
+    use crate::resources::CircleTexture;
     use bevy::asset::Assets;
 
     /// Helper to setup test app with required resources
@@ -448,6 +452,7 @@ mod tests {
         app.insert_resource(PhysicsConfigHandle(physics_handle));
         app.init_resource::<SpawnPosition>();
         app.init_resource::<NextFruitType>();
+        app.insert_resource(CircleTexture(Handle::default()));
 
         app
     }

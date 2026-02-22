@@ -3,12 +3,59 @@
 //! This module handles spawning fruits into the game world with appropriate
 //! physics bodies, colliders, and visual representation.
 
+use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_rapier2d::prelude::*;
 
 use crate::components::Fruit;
 use crate::config::FruitsConfig;
 use crate::fruit::FruitType;
+use crate::resources::CircleTexture;
+
+/// Generates a white circle image and stores it as [`CircleTexture`].
+///
+/// Creates a 128×128 RGBA image where every pixel inside the disc is opaque
+/// white and every pixel outside is fully transparent.  Fruit sprites tint
+/// this texture with `Sprite::color` to achieve their individual colours.
+///
+/// Run this system once at `Startup` (before any fruit is spawned).
+pub fn setup_circle_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    const DIAMETER: u32 = 128;
+    const RADIUS: f32 = 64.0;
+
+    let mut data = vec![0u8; (DIAMETER * DIAMETER * 4) as usize];
+    for y in 0..DIAMETER {
+        for x in 0..DIAMETER {
+            let dx = x as f32 + 0.5 - RADIUS;
+            let dy = y as f32 + 0.5 - RADIUS;
+            let alpha = if dx * dx + dy * dy <= RADIUS * RADIUS {
+                255u8
+            } else {
+                0u8
+            };
+            let idx = ((y * DIAMETER + x) * 4) as usize;
+            data[idx] = 255; // R — white
+            data[idx + 1] = 255; // G — white
+            data[idx + 2] = 255; // B — white
+            data[idx + 3] = alpha; // A — disc shape
+        }
+    }
+
+    let image = Image::new(
+        Extent3d {
+            width: DIAMETER,
+            height: DIAMETER,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    let handle = images.add(image);
+    commands.insert_resource(CircleTexture(handle));
+}
 
 /// Spawns a fruit entity at the specified position
 ///
@@ -38,10 +85,12 @@ use crate::fruit::FruitType;
 /// # use suika_game_core::systems::spawn::spawn_fruit;
 /// # use suika_game_core::fruit::FruitType;
 /// # use suika_game_core::config::{FruitsConfig, FruitsConfigHandle};
+/// # use suika_game_core::prelude::CircleTexture;
 /// fn spawn_system(
 ///     mut commands: Commands,
 ///     fruits_handle: Res<FruitsConfigHandle>,
 ///     fruits_assets: Res<Assets<FruitsConfig>>,
+///     circle_texture: Res<CircleTexture>,
 /// ) {
 ///     if let Some(config) = fruits_assets.get(&fruits_handle.0) {
 ///         let fruit_entity = spawn_fruit(
@@ -49,6 +98,7 @@ use crate::fruit::FruitType;
 ///             FruitType::Cherry,
 ///             Vec2::new(0.0, 300.0),
 ///             config,
+///             circle_texture.0.clone(),
 ///         );
 ///         info!("Spawned fruit with ID: {:?}", fruit_entity);
 ///     }
@@ -59,6 +109,7 @@ pub fn spawn_fruit(
     fruit_type: FruitType,
     position: Vec2,
     config: &FruitsConfig,
+    circle_image: Handle<Image>,
 ) -> Entity {
     let params = fruit_type.parameters_from_config(config);
 
@@ -66,8 +117,11 @@ pub fn spawn_fruit(
         .spawn((
             // Fruit marker component
             Fruit,
-            // Sprite rendering (placeholder - solid color circle)
+            // Sprite rendering — circular placeholder tinted with the fruit colour.
+            // When pixel-art sprites are ready, replace `image` with the real handle
+            // and set `color` to `Color::WHITE`.
             Sprite {
+                image: circle_image,
                 color: fruit_type.placeholder_color(),
                 custom_size: Some(Vec2::splat(params.radius * 2.0)),
                 ..default()
@@ -208,6 +262,7 @@ mod tests {
             FruitType::Cherry,
             Vec2::new(0.0, 100.0),
             &config,
+            Handle::default(),
         );
 
         // Flush commands to apply them
@@ -232,6 +287,7 @@ mod tests {
             FruitType::Strawberry,
             Vec2::new(10.0, 20.0),
             &config,
+            Handle::default(),
         );
 
         app.update();
@@ -251,7 +307,13 @@ mod tests {
 
         let mut commands = app.world_mut().commands();
         let position = Vec2::new(50.0, 150.0);
-        let entity = spawn_fruit(&mut commands, FruitType::Grape, position, &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            FruitType::Grape,
+            position,
+            &config,
+            Handle::default(),
+        );
 
         app.update();
 
@@ -270,7 +332,13 @@ mod tests {
 
         let mut commands = app.world_mut().commands();
         let fruit_type = FruitType::Apple;
-        let entity = spawn_fruit(&mut commands, fruit_type, Vec2::new(0.0, 0.0), &config);
+        let entity = spawn_fruit(
+            &mut commands,
+            fruit_type,
+            Vec2::new(0.0, 0.0),
+            &config,
+            Handle::default(),
+        );
 
         app.update();
 
@@ -300,6 +368,7 @@ mod tests {
             FruitType::Peach,
             Vec2::new(0.0, 0.0),
             &config,
+            Handle::default(),
         );
 
         app.update();
@@ -343,6 +412,7 @@ mod tests {
             FruitType::Pineapple,
             Vec2::new(0.0, 0.0),
             &config,
+            Handle::default(),
         );
 
         app.update();
@@ -375,7 +445,13 @@ mod tests {
 
         for fruit_type in fruit_types {
             let mut commands = app.world_mut().commands();
-            let entity = spawn_fruit(&mut commands, fruit_type, Vec2::new(0.0, 0.0), &config);
+            let entity = spawn_fruit(
+                &mut commands,
+                fruit_type,
+                Vec2::new(0.0, 0.0),
+                &config,
+                Handle::default(),
+            );
             app.update();
 
             assert!(
