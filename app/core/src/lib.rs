@@ -68,7 +68,7 @@ pub mod prelude {
     // Resources
     pub use crate::resources::settings::{Language, SettingsResource};
     pub use crate::resources::{
-        CircleTexture, ComboTimer, GameOverTimer, GameState, NextFruitType,
+        CircleTexture, ComboTimer, FruitSprites, GameOverTimer, GameState, NextFruitType,
     };
     pub use crate::systems::input::{InputMode, LastCursorPosition, SpawnPosition};
 
@@ -175,6 +175,11 @@ impl Plugin for GameCorePlugin {
         // constraints.  setup_circle_texture then fills in the real texture.
         app.init_resource::<resources::CircleTexture>();
         app.add_systems(Startup, systems::spawn::setup_circle_texture);
+
+        // FruitSprites is populated at Startup by the assets crate's load_fruit_sprites.
+        // Initialise the empty resource here so core systems can always use
+        // Option<Res<FruitSprites>> or Res<FruitSprites> safely.
+        app.init_resource::<resources::FruitSprites>();
 
         // Load persisted data into resources at startup
         app.add_systems(

@@ -182,6 +182,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 })
                 .collect(),
         }
