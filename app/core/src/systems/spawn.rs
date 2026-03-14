@@ -102,6 +102,7 @@ pub(crate) fn setup_circle_texture(
 ///             Vec2::new(0.0, 300.0),
 ///             config,
 ///             circle_texture.0.clone(),
+///             None,
 ///         );
 ///         info!("Spawned fruit with ID: {:?}", fruit_entity);
 ///     }

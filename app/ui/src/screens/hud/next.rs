@@ -17,7 +17,7 @@
 
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
-use suika_game_core::prelude::{Fruit, FruitSpawnState, NextFruitType};
+use suika_game_core::prelude::{Fruit, FruitSpawnState, FruitSprites, NextFruitType};
 use suika_game_core::resources::settings::Language;
 
 use crate::config::NextHudConfig;
@@ -73,7 +73,7 @@ pub fn spawn_next_widget(
                 TextColor(TEXT_COLOR),
             ));
 
-            // Preview circle
+            // Preview circle / sprite
             col.spawn((
                 Node {
                     width: Val::Px(cfg.preview_size),
@@ -82,6 +82,7 @@ pub fn spawn_next_widget(
                 },
                 BackgroundColor(Color::WHITE),
                 BorderRadius::all(Val::Percent(50.0)),
+                ImageNode::default(),
                 Visibility::Hidden,
                 HudNextPreview,
             ));
@@ -94,19 +95,26 @@ pub fn spawn_next_widget(
 
 /// Updates the next-fruit preview circle every frame.
 ///
-/// - **Colour**: refreshed whenever [`NextFruitType`] changes.
-/// - **Visibility**: shown while a held or falling fruit exists; hidden
-///   otherwise (same rule as the old world-space preview).
+/// - **Sprite / colour**: refreshed whenever [`NextFruitType`] or [`FruitSprites`] changes.
+///   Uses the real sprite image when available; falls back to a tinted placeholder circle.
+/// - **Visibility**: shown while a held or falling fruit exists; hidden otherwise.
 pub fn update_next(
     next_fruit: Res<NextFruitType>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
-    mut preview_q: Query<(&mut BackgroundColor, &mut Visibility), With<HudNextPreview>>,
+    mut preview_q: Query<
+        (&mut BackgroundColor, &mut Visibility, &mut ImageNode, &mut BorderRadius),
+        With<HudNextPreview>,
+    >,
+    fruit_sprites: Option<Res<FruitSprites>>,
 ) {
     let has_active = fruit_states
         .iter()
         .any(|s| *s == FruitSpawnState::Held || *s == FruitSpawnState::Falling);
 
-    for (mut bg, mut vis) in preview_q.iter_mut() {
+    let sprites_changed = fruit_sprites.as_ref().map(|s| s.is_changed()).unwrap_or(false);
+    let should_update_sprite = next_fruit.is_changed() || sprites_changed;
+
+    for (mut bg, mut vis, mut image_node, mut border_radius) in preview_q.iter_mut() {
         let desired = if has_active {
             Visibility::Visible
         } else {
@@ -116,10 +124,22 @@ pub fn update_next(
             *vis = desired;
         }
 
-        // Always write the correct colour so that newly-spawned preview
-        // widgets (e.g. after HUD rebuild on pause/resume) get the right
-        // colour even when NextFruitType itself has not changed this frame.
-        *bg = BackgroundColor(next_fruit.get().placeholder_color());
+        // Always refresh so newly-spawned HUD widgets get the correct state.
+        if should_update_sprite || image_node.image == Handle::default() {
+            if let Some(handle) = fruit_sprites.as_deref().and_then(|s| s.get(next_fruit.get())) {
+                // Real sprite available — show it directly, no circle clipping.
+                image_node.image = handle.clone();
+                image_node.color = Color::WHITE;
+                *bg = BackgroundColor(Color::NONE);
+                *border_radius = BorderRadius::ZERO;
+            } else {
+                // Fallback: tinted placeholder circle.
+                image_node.image = Handle::default();
+                image_node.color = Color::WHITE;
+                *bg = BackgroundColor(next_fruit.get().placeholder_color());
+                *border_radius = BorderRadius::all(Val::Percent(50.0));
+            }
+        }
     }
 }
 
