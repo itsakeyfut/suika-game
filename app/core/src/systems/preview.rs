@@ -197,6 +197,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Strawberry".to_string(),
@@ -205,6 +206,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Grape".to_string(),
@@ -213,6 +215,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Dekopon".to_string(),
@@ -221,6 +224,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Persimmon".to_string(),
@@ -229,6 +233,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Apple".to_string(),
@@ -237,6 +242,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Pear".to_string(),
@@ -245,6 +251,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Peach".to_string(),
@@ -253,6 +260,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Pineapple".to_string(),
@@ -261,6 +269,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Melon".to_string(),
@@ -269,6 +278,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Watermelon".to_string(),
@@ -277,6 +287,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
             ],
         };

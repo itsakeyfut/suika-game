@@ -67,6 +67,44 @@ pub struct FruitConfigEntry {
     pub friction: f32,
     /// Mass multiplier (mass = radius² × mass_multiplier)
     pub mass_multiplier: f32,
+    /// Visual scale multiplier applied to the sprite only (1.0 = matches collider).
+    /// Defaults to `1.0` when omitted from the RON file.
+    #[serde(default = "default_sprite_scale")]
+    pub sprite_scale: f32,
+    /// Horizontal anchor offset for the sprite in normalised coordinates (−0.5 … +0.5).
+    ///
+    /// Positive = sprite drawn to the left; negative = sprite drawn to the right.
+    /// Defaults to `0.0` (centred) when omitted from the RON file.
+    #[serde(default)]
+    pub sprite_anchor_x: f32,
+    /// Vertical anchor offset for the sprite in normalised coordinates (−0.5 … +0.5).
+    ///
+    /// Positive = sprite drawn lower; negative = sprite drawn higher than the
+    /// physics body position.  Use this to fine-tune sprite alignment when the
+    /// sprite has transparent padding or an asymmetric shape.
+    /// Defaults to `0.0` (centred on the collider) when omitted from the RON file.
+    #[serde(default)]
+    pub sprite_anchor_y: f32,
+}
+
+fn default_sprite_scale() -> f32 {
+    1.0
+}
+
+impl Default for FruitConfigEntry {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            radius: 1.0,
+            points: 0,
+            restitution: 0.3,
+            friction: 0.5,
+            mass_multiplier: 0.01,
+            sprite_scale: 1.0,
+            sprite_anchor_x: 0.0,
+            sprite_anchor_y: 0.0,
+        }
+    }
 }
 
 /// Resource holding the handle to the loaded fruits configuration

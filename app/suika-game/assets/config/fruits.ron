@@ -21,6 +21,9 @@ FruitsConfig(
             restitution: 0.3,
             friction: 0.5,
             mass_multiplier: 0.01,
+            sprite_scale: 1.98,
+            sprite_anchor_x: -0.02,
+            sprite_anchor_y: -0.075,
         ),
         // Stage 2: Strawberry (spawnable)
         (

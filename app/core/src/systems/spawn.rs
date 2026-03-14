@@ -6,12 +6,13 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::sprite::Anchor;
 use bevy_rapier2d::prelude::*;
 
 use crate::components::Fruit;
 use crate::config::FruitsConfig;
 use crate::fruit::FruitType;
-use crate::resources::CircleTexture;
+use crate::resources::{CircleTexture, FruitSprites};
 
 /// Generates a white circle image and stores it as [`CircleTexture`].
 ///
@@ -112,22 +113,28 @@ pub fn spawn_fruit(
     position: Vec2,
     config: &FruitsConfig,
     circle_image: Handle<Image>,
+    sprites: Option<&FruitSprites>,
 ) -> Entity {
     let params = fruit_type.parameters_from_config(config);
+
+    // Prefer a real sprite when available; otherwise use the tinted placeholder.
+    let (image, color) = sprites
+        .map(|s| s.resolve(fruit_type, circle_image.clone()))
+        .unwrap_or_else(|| (circle_image, fruit_type.placeholder_color()));
 
     commands
         .spawn((
             // Fruit marker component
             Fruit,
-            // Sprite rendering — circular placeholder tinted with the fruit colour.
-            // When pixel-art sprites are ready, replace `image` with the real handle
-            // and set `color` to `Color::WHITE`.
+            // Sprite rendering — real sprite or tinted circle placeholder.
             Sprite {
-                image: circle_image,
-                color: fruit_type.placeholder_color(),
-                custom_size: Some(Vec2::splat(params.radius * 2.0)),
+                image,
+                color,
+                custom_size: Some(Vec2::splat(params.radius * 2.0 * params.sprite_scale)),
                 ..default()
             },
+            // Sprite anchor offset (horizontal + vertical) for fine-tuned alignment.
+            Anchor(Vec2::new(params.sprite_anchor_x, params.sprite_anchor_y)),
             // Transform (position, rotation, scale)
             Transform::from_xyz(position.x, position.y, 0.0),
             // Physics: Dynamic rigid body (affected by gravity and forces)
@@ -167,6 +174,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Strawberry".to_string(),
@@ -175,6 +183,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Grape".to_string(),
@@ -183,6 +192,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Dekopon".to_string(),
@@ -191,6 +201,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Persimmon".to_string(),
@@ -199,6 +210,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Apple".to_string(),
@@ -207,6 +219,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Pear".to_string(),
@@ -215,6 +228,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Peach".to_string(),
@@ -223,6 +237,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Pineapple".to_string(),
@@ -231,6 +246,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Melon".to_string(),
@@ -239,6 +255,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Watermelon".to_string(),
@@ -247,6 +264,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
             ],
         }
@@ -265,6 +283,7 @@ mod tests {
             Vec2::new(0.0, 100.0),
             &config,
             Handle::default(),
+            None,
         );
 
         // Flush commands to apply them
@@ -290,6 +309,7 @@ mod tests {
             Vec2::new(10.0, 20.0),
             &config,
             Handle::default(),
+            None,
         );
 
         app.update();
@@ -315,6 +335,7 @@ mod tests {
             position,
             &config,
             Handle::default(),
+            None,
         );
 
         app.update();
@@ -340,6 +361,7 @@ mod tests {
             Vec2::new(0.0, 0.0),
             &config,
             Handle::default(),
+            None,
         );
 
         app.update();
@@ -354,7 +376,7 @@ mod tests {
         // Verify sprite has correct size (diameter = radius * 2)
         let sprite = sprite.unwrap();
         let params = fruit_type.parameters_from_config(&config);
-        let expected_size = Vec2::splat(params.radius * 2.0);
+        let expected_size = Vec2::splat(params.radius * 2.0 * params.sprite_scale);
         assert_eq!(sprite.custom_size, Some(expected_size));
     }
 
@@ -371,6 +393,7 @@ mod tests {
             Vec2::new(0.0, 0.0),
             &config,
             Handle::default(),
+            None,
         );
 
         app.update();
@@ -415,6 +438,7 @@ mod tests {
             Vec2::new(0.0, 0.0),
             &config,
             Handle::default(),
+            None,
         );
 
         app.update();
@@ -453,6 +477,7 @@ mod tests {
                 Vec2::new(0.0, 0.0),
                 &config,
                 Handle::default(),
+                None,
             );
             app.update();
 
