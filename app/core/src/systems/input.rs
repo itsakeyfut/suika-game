@@ -7,6 +7,7 @@
 //! - Automatic spawning of next fruit after drop
 
 use bevy::prelude::*;
+use bevy::sprite::Anchor;
 use bevy::window::PrimaryWindow;
 use bevy_rapier2d::prelude::*;
 
@@ -19,7 +20,7 @@ use crate::config::{
     PhysicsConfigHandle,
 };
 use crate::fruit::FruitType;
-use crate::resources::{CircleTexture, NextFruitType};
+use crate::resources::{CircleTexture, FruitSprites, NextFruitType};
 
 // ---------------------------------------------------------------------------
 // Default values for RON-loaded parameters (fallbacks before configs are loaded)
@@ -105,6 +106,7 @@ pub fn spawn_held_fruit(
     rules_config_handle: Option<Res<GameRulesConfigHandle>>,
     rules_config_assets: Option<Res<Assets<GameRulesConfig>>>,
     circle_texture: Res<CircleTexture>,
+    fruit_sprites: Option<Res<FruitSprites>>,
 ) {
     // Get the configs, return early if not loaded yet
     let Some(fruits_config) = fruits_config_assets.get(&fruits_config_handle.0) else {
@@ -161,14 +163,26 @@ pub fn spawn_held_fruit(
             Fruit,
             next_fruit.get(),
             FruitSpawnState::Held,
-            // Circular placeholder sprite — tinted with the fruit colour.
-            // Swap `image` for a real asset handle when pixel-art sprites are ready.
-            Sprite {
-                image: circle_texture.0.clone(),
-                color: next_fruit.get().placeholder_color(),
-                custom_size: Some(Vec2::splat(params.radius * 2.0)),
-                ..default()
+            // Sprite: use the real asset when available, otherwise a tinted circle.
+            {
+                let (image, color) = fruit_sprites
+                    .as_ref()
+                    .map(|s| s.resolve(next_fruit.get(), circle_texture.0.clone()))
+                    .unwrap_or_else(|| {
+                        (
+                            circle_texture.0.clone(),
+                            next_fruit.get().placeholder_color(),
+                        )
+                    });
+                Sprite {
+                    image,
+                    color,
+                    custom_size: Some(Vec2::splat(params.radius * 2.0 * params.sprite_scale)),
+                    ..default()
+                }
             },
+            // Sprite anchor offset (horizontal + vertical) for fine-tuned alignment.
+            Anchor(Vec2::new(params.sprite_anchor_x, params.sprite_anchor_y)),
             Transform::from_xyz(spawn_pos.x, spawn_y, 0.0),
             // Kinematic body (no gravity, manually controlled)
             RigidBody::KinematicPositionBased,
@@ -477,6 +491,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Strawberry".to_string(),
@@ -485,6 +500,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Grape".to_string(),
@@ -493,6 +509,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Dekopon".to_string(),
@@ -501,6 +518,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Persimmon".to_string(),
@@ -509,6 +527,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Apple".to_string(),
@@ -517,6 +536,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Pear".to_string(),
@@ -525,6 +545,7 @@ mod tests {
                     restitution: 0.25,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Peach".to_string(),
@@ -533,6 +554,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Pineapple".to_string(),
@@ -541,6 +563,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Melon".to_string(),
@@ -549,6 +572,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
                 FruitConfigEntry {
                     name: "Watermelon".to_string(),
@@ -557,6 +581,7 @@ mod tests {
                     restitution: 0.2,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 },
             ],
         }

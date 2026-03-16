@@ -13,7 +13,7 @@ use bevy_rapier2d::prelude::ActiveEvents;
 use crate::components::FruitSpawnState;
 use crate::config::{BounceConfig, BounceConfigHandle, FruitsConfig, FruitsConfigHandle};
 use crate::events::FruitMergeEvent;
-use crate::resources::CircleTexture;
+use crate::resources::{CircleTexture, FruitSprites};
 use crate::systems::effects::bounce::SquashStretchAnimation;
 use crate::systems::spawn::spawn_fruit;
 
@@ -34,6 +34,7 @@ use crate::systems::spawn::spawn_fruit;
 ///
 /// If the fruits config asset is not yet loaded, all events are consumed but
 /// no merges are executed. This avoids panics during startup.
+#[allow(clippy::too_many_arguments)]
 pub fn handle_fruit_merge(
     mut commands: Commands,
     mut merge_events: MessageReader<FruitMergeEvent>,
@@ -42,6 +43,7 @@ pub fn handle_fruit_merge(
     bounce_handle: Option<Res<BounceConfigHandle>>,
     bounce_assets: Option<Res<Assets<BounceConfig>>>,
     circle_texture: Res<CircleTexture>,
+    fruit_sprites: Option<Res<FruitSprites>>,
 ) {
     let Some(fruits_config) = fruits_assets.get(&fruits_handle.0) else {
         // Drain events to prevent stale buffering
@@ -80,6 +82,7 @@ pub fn handle_fruit_merge(
                 event.position,
                 fruits_config,
                 circle_texture.0.clone(),
+                fruit_sprites.as_deref(),
             );
 
             // Add components required for collision detection and the pop-in animation
@@ -124,6 +127,7 @@ mod tests {
                     restitution: 0.3,
                     friction: 0.5,
                     mass_multiplier: 0.01,
+                    ..Default::default()
                 })
                 .collect(),
         }
@@ -156,6 +160,7 @@ mod tests {
             Vec2::ZERO,
             &config,
             Handle::default(),
+            None,
         );
         // Flush commands so entity exists before further operations
         app.update();

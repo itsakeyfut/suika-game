@@ -1,23 +1,20 @@
-//! # game-assets
+//! # suika-game-assets
 //!
-//! アセット管理：スプライト、サウンド、フォントの読み込み
+//! Asset loading for the Suika Game: sprites, sounds, and fonts.
 
 use bevy::prelude::*;
 
-// TODO: モジュールの追加
-// pub mod sprites;
-// pub mod sounds;
-// pub mod fonts;
+pub mod sprites;
 
-/// アセット管理プラグイン
+/// Asset management plugin.
+///
+/// Registers all asset-loading systems with the Bevy app.
+/// Must be added after `DefaultPlugins` (which includes `AssetPlugin`).
 pub struct GameAssetsPlugin;
 
 impl Plugin for GameAssetsPlugin {
-    fn build(&self, _app: &mut App) {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, sprites::load_fruit_sprites);
         info!("GameAssetsPlugin initialized");
-
-        // TODO: アセットローディングシステムの登録
-        // app
-        //     .add_systems(Startup, load_all_assets);
     }
 }

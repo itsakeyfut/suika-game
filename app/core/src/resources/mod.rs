@@ -11,12 +11,14 @@ pub mod game;
 pub mod game_over;
 pub mod settings;
 pub mod spawn;
+pub mod sprites;
 
 pub use combo::ComboTimer;
 pub use game::GameState;
 pub use game_over::GameOverTimer;
 pub use settings::{Language, SettingsResource};
 pub use spawn::NextFruitType;
+pub use sprites::FruitSprites;
 
 /// Shared white circle texture used as placeholder for fruit sprites.
 ///

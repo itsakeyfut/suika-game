@@ -46,6 +46,13 @@ pub struct FruitParams {
     pub friction: f32,
     /// Points awarded when this fruit is created by merging
     pub points: u32,
+    /// Visual scale multiplier (sprite diameter = radius × 2 × sprite_scale).
+    /// Does not affect the physics collider.
+    pub sprite_scale: f32,
+    /// Horizontal anchor offset passed to `Sprite::anchor` (see `FruitConfigEntry::sprite_anchor_x`).
+    pub sprite_anchor_x: f32,
+    /// Vertical anchor offset passed to `Sprite::anchor` (see `FruitConfigEntry::sprite_anchor_y`).
+    pub sprite_anchor_y: f32,
 }
 
 impl FruitType {
@@ -94,6 +101,9 @@ impl FruitType {
             restitution: entry.restitution,
             friction: entry.friction,
             points: entry.points,
+            sprite_scale: entry.sprite_scale,
+            sprite_anchor_x: entry.sprite_anchor_x,
+            sprite_anchor_y: entry.sprite_anchor_y,
         })
     }
 
