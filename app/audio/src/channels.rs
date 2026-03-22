@@ -1,26 +1,38 @@
 //! Typed audio channels for BGM and SFX.
 //!
-//! Using two separate [`AudioChannel`] buses means the user's volume slider
-//! controls **all** sounds on that bus at once, independently of the
-//! per-sound design volumes set in `assets/config/audio.ron`.
+//! Using two separate [`AudioChannel`] buses lets BGM and SFX be controlled
+//! independently.  Because `bevy_kira_audio`'s `.with_volume(design_dB)`
+//! overrides the channel-level volume for **new** sounds, user preference and
+//! design offset are combined at the call site rather than applied separately.
 //!
-//! # Architecture
+//! # Effective-volume model
 //!
 //! ```text
-//! AudioChannel<BgmChannel>  ← set_volume(user_bgm_dB)
-//!   └─ bgm_handles.title / game / gameover   ← with_volume(design_dB)
-//!
-//! AudioChannel<SfxChannel>  ← set_volume(user_sfx_dB)
-//!   └─ sfx_handles.*                         ← with_volume(design_dB)
+//! effective_dB = design_dB (AudioConfig)  +  user_dB (SettingsResource)
 //! ```
 //!
-//! When the user sets volume to 0 the channel is driven to −100 dB, which
-//! bevy_kira_audio / kira rounds to silence, guaranteeing no audio leaks
-//! through regardless of the per-sound design levels.
+//! This combined value is passed to `.with_volume(effective_dB)` each time a
+//! sound is started, and to `AudioChannel::set_volume(effective_dB)` when the
+//! user adjusts the slider (so already-playing BGM updates immediately).
+//!
+//! ```text
+//! AudioChannel<BgmChannel>
+//!   └─ bgm_handles.*  ← .with_volume(design_dB + user_bgm_dB)   at track start
+//!                     ← set_volume(design_dB + user_bgm_dB)      on settings change
+//!
+//! AudioChannel<SfxChannel>
+//!   └─ sfx_handles.*  ← .with_volume(design_dB + user_sfx_dB)   at each SFX play
+//! ```
+//!
+//! When the user sets volume to 0 the user_dB term is −100 dB, which
+//! bevy_kira_audio / kira rounds to silence regardless of the design offset.
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use suika_game_core::resources::settings::SettingsResource;
+
+use crate::bgm::{BgmTrack, CurrentBgm};
+use crate::config::{AudioConfig, AudioConfigHandle};
 
 // ---------------------------------------------------------------------------
 // Channel marker types
@@ -110,9 +122,26 @@ pub fn apply_volume_settings(
     bgm_channel: Res<AudioChannel<BgmChannel>>,
     sfx_channel: Res<AudioChannel<SfxChannel>>,
     mut prev: ResMut<PreviousVolume>,
+    current_bgm: Res<CurrentBgm>,
+    audio_config_handle: Option<Res<AudioConfigHandle>>,
+    audio_config_assets: Res<Assets<AudioConfig>>,
 ) {
     if settings.bgm_volume != prev.bgm {
-        bgm_channel.set_volume(volume_to_db(settings.bgm_volume));
+        // Combine design dB (track-specific offset from AudioConfig) with the
+        // user's volume preference so that already-playing BGM stays consistent
+        // with the volume used when the track was started.
+        let default_cfg = AudioConfig::default();
+        let cfg = audio_config_handle
+            .as_ref()
+            .and_then(|h| audio_config_assets.get(&h.0))
+            .unwrap_or(&default_cfg);
+        let design_db = match current_bgm.track {
+            BgmTrack::Title => cfg.bgm_title_volume,
+            BgmTrack::Game => cfg.bgm_game_volume,
+            BgmTrack::GameOver => cfg.bgm_gameover_volume,
+            BgmTrack::None => 0.0,
+        };
+        bgm_channel.set_volume(design_db + volume_to_db(settings.bgm_volume));
         prev.bgm = settings.bgm_volume;
     }
     if settings.sfx_volume != prev.sfx {
