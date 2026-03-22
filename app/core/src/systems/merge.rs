@@ -111,14 +111,12 @@ pub fn handle_fruit_merge(
 // Plugin
 // ---------------------------------------------------------------------------
 
-use bevy::prelude::Plugin;
-
 pub struct MergePlugin;
 
 impl Plugin for MergePlugin {
-    fn build(&self, app: &mut bevy::prelude::App) {
+    fn build(&self, app: &mut App) {
         app.add_systems(
-            bevy::prelude::Update,
+            Update,
             handle_fruit_merge.after(crate::systems::collision::detect_fruit_contact),
         );
     }

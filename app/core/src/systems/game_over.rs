@@ -134,10 +134,9 @@ pub fn reset_game_state(
 
 pub struct GameOverPlugin;
 
-impl bevy::prelude::Plugin for GameOverPlugin {
-    fn build(&self, app: &mut bevy::prelude::App) {
+impl Plugin for GameOverPlugin {
+    fn build(&self, app: &mut App) {
         use crate::states::AppState;
-        use bevy::prelude::*;
 
         // Elapsed-time tick (Playing state only)
         app.add_systems(
