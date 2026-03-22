@@ -90,6 +90,52 @@ pub fn animate_merge_scale(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Plugin
+// ---------------------------------------------------------------------------
+
+pub struct EffectsPlugin;
+
+impl Plugin for EffectsPlugin {
+    fn build(&self, app: &mut App) {
+        use crate::resources::SettingsResource;
+        use crate::states::AppState;
+
+        // Always-on effects while Playing
+        app.add_systems(
+            Update,
+            (
+                animate_merge_scale.after(crate::systems::merge::handle_fruit_merge),
+                bounce::animate_squash_stretch.after(crate::systems::merge::handle_fruit_merge),
+            )
+                .run_if(in_state(AppState::Playing)),
+        );
+
+        // Effects-gated: particles, flash, shake, watermelon burst
+        app.add_systems(
+            Update,
+            (
+                droplet::spawn_merge_droplets.after(crate::systems::merge::handle_fruit_merge),
+                droplet::handle_fruit_landing,
+                droplet::update_water_droplets,
+                flash::spawn_merge_flash.after(crate::systems::merge::handle_fruit_merge),
+                flash::animate_local_flash,
+                flash::animate_screen_flash,
+                shake::add_camera_shake.after(crate::systems::merge::handle_fruit_merge),
+                watermelon::spawn_watermelon_effects
+                    .after(crate::systems::merge::handle_fruit_merge),
+                watermelon::animate_watermelon_explosion,
+                watermelon::update_watermelon_burst_particles,
+            )
+                .run_if(in_state(AppState::Playing))
+                .run_if(|settings: Res<SettingsResource>| settings.effects_enabled),
+        );
+
+        // Camera shake apply runs every frame (not gated on Playing)
+        app.add_systems(Update, shake::apply_camera_shake);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

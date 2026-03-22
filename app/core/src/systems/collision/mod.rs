@@ -187,6 +187,27 @@ pub fn clear_processed_collisions(mut processed: ResMut<ProcessedCollisions>) {
     processed.pairs.clear();
 }
 
+// ---------------------------------------------------------------------------
+// Plugin
+// ---------------------------------------------------------------------------
+
+pub struct CollisionPlugin;
+
+impl Plugin for CollisionPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ProcessedCollisions>();
+        app.add_systems(
+            Update,
+            (
+                detect_fruit_contact,
+                clear_processed_collisions
+                    .after(crate::systems::merge::handle_fruit_merge)
+                    .after(crate::systems::score::update_score_on_merge),
+            ),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

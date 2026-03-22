@@ -163,6 +163,22 @@ pub fn tick_combo_timer(mut combo_timer: ResMut<ComboTimer>, time: Res<Time>) {
     combo_timer.check_and_reset();
 }
 
+// ---------------------------------------------------------------------------
+// Plugin
+// ---------------------------------------------------------------------------
+
+pub struct ScorePlugin;
+
+impl Plugin for ScorePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            update_score_on_merge.after(crate::systems::collision::detect_fruit_contact),
+        );
+        app.add_systems(Update, tick_combo_timer.after(update_score_on_merge));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -129,6 +129,35 @@ pub fn reset_game_state(
 }
 
 // ---------------------------------------------------------------------------
+// Plugin
+// ---------------------------------------------------------------------------
+
+pub struct GameOverPlugin;
+
+impl bevy::prelude::Plugin for GameOverPlugin {
+    fn build(&self, app: &mut bevy::prelude::App) {
+        use crate::states::AppState;
+        use bevy::prelude::*;
+
+        // Elapsed-time tick (Playing state only)
+        app.add_systems(
+            Update,
+            tick_elapsed_time.run_if(in_state(AppState::Playing)),
+        );
+
+        // Highscore persistence on game over
+        app.add_systems(
+            OnEnter(AppState::GameOver),
+            save_highscore_on_game_over.in_set(GameOverSet::SaveHighscore),
+        );
+
+        // Reset game state in two places to cover all "new game" entry paths
+        app.add_systems(OnExit(AppState::GameOver), reset_game_state);
+        app.add_systems(OnExit(AppState::Title), reset_game_state);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

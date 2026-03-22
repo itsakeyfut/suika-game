@@ -38,6 +38,24 @@ pub fn resume_physics(
 }
 
 // ---------------------------------------------------------------------------
+// Plugin
+// ---------------------------------------------------------------------------
+
+use bevy::prelude::Plugin;
+
+pub struct PausePlugin;
+
+impl Plugin for PausePlugin {
+    fn build(&self, app: &mut bevy::prelude::App) {
+        use crate::states::AppState;
+        use bevy::prelude::*;
+
+        app.add_systems(OnEnter(AppState::Paused), pause_physics);
+        app.add_systems(OnExit(AppState::Paused), resume_physics);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

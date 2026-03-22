@@ -106,6 +106,28 @@ pub fn animate_boundary_warning(
 }
 
 // ---------------------------------------------------------------------------
+// Plugin
+// ---------------------------------------------------------------------------
+
+use bevy::prelude::Plugin;
+
+pub struct BoundaryPlugin;
+
+impl Plugin for BoundaryPlugin {
+    fn build(&self, app: &mut bevy::prelude::App) {
+        app.add_systems(
+            bevy::prelude::Update,
+            (
+                check_boundary_overflow,
+                trigger_game_over.after(check_boundary_overflow),
+                animate_boundary_warning.after(check_boundary_overflow),
+            )
+                .run_if(bevy::prelude::in_state(crate::states::AppState::Playing)),
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

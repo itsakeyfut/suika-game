@@ -102,7 +102,12 @@ pub fn update_next(
     next_fruit: Res<NextFruitType>,
     fruit_states: Query<&FruitSpawnState, With<Fruit>>,
     mut preview_q: Query<
-        (&mut BackgroundColor, &mut Visibility, &mut ImageNode, &mut BorderRadius),
+        (
+            &mut BackgroundColor,
+            &mut Visibility,
+            &mut ImageNode,
+            &mut BorderRadius,
+        ),
         With<HudNextPreview>,
     >,
     fruit_sprites: Option<Res<FruitSprites>>,
@@ -111,7 +116,10 @@ pub fn update_next(
         .iter()
         .any(|s| *s == FruitSpawnState::Held || *s == FruitSpawnState::Falling);
 
-    let sprites_changed = fruit_sprites.as_ref().map(|s| s.is_changed()).unwrap_or(false);
+    let sprites_changed = fruit_sprites
+        .as_ref()
+        .map(|s| s.is_changed())
+        .unwrap_or(false);
     let should_update_sprite = next_fruit.is_changed() || sprites_changed;
 
     for (mut bg, mut vis, mut image_node, mut border_radius) in preview_q.iter_mut() {
@@ -126,7 +134,10 @@ pub fn update_next(
 
         // Always refresh so newly-spawned HUD widgets get the correct state.
         if should_update_sprite || image_node.image == Handle::default() {
-            if let Some(handle) = fruit_sprites.as_deref().and_then(|s| s.get(next_fruit.get())) {
+            if let Some(handle) = fruit_sprites
+                .as_deref()
+                .and_then(|s| s.get(next_fruit.get()))
+            {
                 // Real sprite available — show it directly, no circle clipping.
                 image_node.image = handle.clone();
                 image_node.color = Color::WHITE;

@@ -165,16 +165,12 @@ impl Plugin for GameCorePlugin {
             .init_resource::<resources::ComboTimer>()
             .init_resource::<resources::GameOverTimer>()
             .init_resource::<resources::NextFruitType>()
-            .init_resource::<resources::SettingsResource>()
-            .init_resource::<systems::input::SpawnPosition>()
-            .init_resource::<systems::input::InputMode>()
-            .init_resource::<systems::input::LastCursorPosition>();
+            .init_resource::<resources::SettingsResource>();
 
         // Register CircleTexture immediately (default = invalid handle) so any
         // Startup system can safely declare Res<CircleTexture> without ordering
         // constraints.  setup_circle_texture then fills in the real texture.
         app.init_resource::<resources::CircleTexture>();
-        app.add_systems(Startup, systems::spawn::setup_circle_texture);
 
         // FruitSprites is populated at Startup by the assets crate's load_fruit_sprites.
         // Initialise the empty resource here so core systems can always use
@@ -194,152 +190,25 @@ impl Plugin for GameCorePlugin {
         app.add_message::<events::FruitMergeEvent>();
         app.add_message::<events::ScoreEarnedEvent>();
 
-        // Initialize collision detection resources
-        app.init_resource::<systems::collision::ProcessedCollisions>();
-
-        // Collision detection, merge, and score systems (Phase 5)
-        app.add_systems(
-            Update,
-            (
-                systems::collision::detect_fruit_contact,
-                systems::merge::handle_fruit_merge.after(systems::collision::detect_fruit_contact),
-                systems::score::update_score_on_merge
-                    .after(systems::collision::detect_fruit_contact),
-                systems::collision::clear_processed_collisions
-                    .after(systems::merge::handle_fruit_merge)
-                    .after(systems::score::update_score_on_merge),
-            ),
-        );
-
-        // Combo timer tick (must run after merge scoring to avoid premature combo resets)
-        app.add_systems(
-            Update,
-            systems::score::tick_combo_timer.after(systems::score::update_score_on_merge),
-        );
-
-        // Visual effects — all gated on Playing so they freeze during Paused.
-        //
-        // Two groups:
-        //   1. Always-on: squash-stretch bounce (preserves physical feel)
-        //   2. Effects-gated: particles, flash, shake, watermelon burst
-        //      (disabled when SettingsResource::effects_enabled is false)
-        app.add_systems(
-            Update,
-            (
-                // Merge scale animation (always on while Playing)
-                systems::effects::animate_merge_scale.after(systems::merge::handle_fruit_merge),
-                // Squash-and-stretch bounce (always on — physical feel)
-                systems::effects::bounce::animate_squash_stretch
-                    .after(systems::merge::handle_fruit_merge),
-            )
-                .run_if(in_state(states::AppState::Playing)),
-        );
-
-        // Particle / flash / shake effects — gated on both Playing AND effects_enabled.
-        app.add_systems(
-            Update,
-            (
-                // Water droplet particles
-                systems::effects::droplet::spawn_merge_droplets
-                    .after(systems::merge::handle_fruit_merge),
-                systems::effects::droplet::handle_fruit_landing,
-                systems::effects::droplet::update_water_droplets,
-                // Flash effects
-                systems::effects::flash::spawn_merge_flash
-                    .after(systems::merge::handle_fruit_merge),
-                systems::effects::flash::animate_local_flash,
-                systems::effects::flash::animate_screen_flash,
-                // Camera shake — trauma accumulates on merge (Playing only)
-                systems::effects::shake::add_camera_shake.after(systems::merge::handle_fruit_merge),
-                // Watermelon special effects
-                systems::effects::watermelon::spawn_watermelon_effects
-                    .after(systems::merge::handle_fruit_merge),
-                systems::effects::watermelon::animate_watermelon_explosion,
-                systems::effects::watermelon::update_watermelon_burst_particles,
-            )
-                .run_if(in_state(states::AppState::Playing))
-                .run_if(|settings: Res<resources::SettingsResource>| settings.effects_enabled),
-        );
-
-        // Camera shake apply runs every frame (not gated on Playing) so that
-        // trauma decays and the camera snaps back even while Paused or in GameOver.
-        app.add_systems(Update, systems::effects::shake::apply_camera_shake);
-
-        // Elapsed-time tick (Playing state only)
-        app.add_systems(
-            Update,
-            systems::game_over::tick_elapsed_time.run_if(in_state(states::AppState::Playing)),
-        );
-
-        // Phase 6: boundary overflow detection and game-over transition
-        // All three run only during active gameplay.
-        app.add_systems(
-            Update,
-            (
-                systems::boundary::check_boundary_overflow,
-                systems::boundary::trigger_game_over
-                    .after(systems::boundary::check_boundary_overflow),
-                systems::boundary::animate_boundary_warning
-                    .after(systems::boundary::check_boundary_overflow),
-            )
-                .run_if(in_state(states::AppState::Playing)),
-        );
-
-        // Phase 6: highscore persistence on game over.
-        // Registered inside GameOverSet::SaveHighscore so that other crates
-        // (e.g. UI) can order their OnEnter(GameOver) systems after this set
-        // and safely read GameState::is_new_record / highscore.
-        app.add_systems(
-            OnEnter(states::AppState::GameOver),
-            systems::game_over::save_highscore_on_game_over
-                .in_set(systems::game_over::GameOverSet::SaveHighscore),
-        );
-
-        // Reset game state in two places to cover all "new game" entry paths
-        // while NOT resetting on Paused → Playing (resume):
-        //   • OnExit(GameOver)  — GameOver → Playing  /  GameOver → Title → Playing
-        //   • OnExit(Title)     — Title → Playing  /  (Paused → Title → Playing)
-        // Paused → Playing never passes through either of these, so the current
-        // session is preserved on resume.
-        app.add_systems(
-            OnExit(states::AppState::GameOver),
-            systems::game_over::reset_game_state,
-        );
-        app.add_systems(
-            OnExit(states::AppState::Title),
-            systems::game_over::reset_game_state,
-        );
-
-        // Pause / resume: freeze the physics pipeline while paused.
-        // All gameplay input and scoring systems already gate on Playing, so
-        // this is the only change needed to fully suspend the simulation.
-        app.add_systems(
-            OnEnter(states::AppState::Paused),
-            systems::pause::pause_physics,
-        );
-        app.add_systems(
-            OnExit(states::AppState::Paused),
-            systems::pause::resume_physics,
-        );
-
         // Spawn the physics container walls once all configs are loaded
         app.add_systems(
             OnExit(states::AppState::Loading),
             systems::container::setup_container,
         );
 
-        // Gameplay input systems — only active while Playing
-        app.add_systems(
-            Update,
-            (
-                systems::input::update_spawn_position,
-                systems::input::handle_fruit_drop_input
-                    .after(systems::input::update_spawn_position),
-                systems::input::detect_fruit_landing,
-                systems::input::spawn_held_fruit.after(systems::input::detect_fruit_landing),
-            )
-                .run_if(in_state(states::AppState::Playing)),
-        );
+        // Sub-plugins (each owns its system registrations)
+        app.add_plugins((
+            systems::spawn::SpawnPlugin,
+            systems::collision::CollisionPlugin,
+            systems::merge::MergePlugin,
+            systems::score::ScorePlugin,
+            systems::effects::EffectsPlugin,
+            systems::input::InputPlugin,
+            systems::preview::PreviewPlugin,
+            systems::boundary::BoundaryPlugin,
+            systems::game_over::GameOverPlugin,
+            systems::pause::PausePlugin,
+        ));
     }
 }
 
