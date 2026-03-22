@@ -134,8 +134,9 @@ pub fn update_next(
                 *border_radius = BorderRadius::ZERO;
             } else {
                 // Fallback: tinted placeholder circle.
+                // Set image transparent so BackgroundColor shows through.
                 image_node.image = Handle::default();
-                image_node.color = Color::WHITE;
+                image_node.color = Color::NONE;
                 *bg = BackgroundColor(next_fruit.get().placeholder_color());
                 *border_radius = BorderRadius::all(Val::Percent(50.0));
             }
