@@ -131,6 +131,7 @@ pub fn setup_fruit_preview(
 /// - When held/falling fruit exists: Shows preview
 /// - When no active fruits: Hides preview
 /// - Position remains fixed (does not follow spawn position)
+#[allow(clippy::too_many_arguments)]
 pub fn update_fruit_preview(
     mut preview_query: Query<(&mut Sprite, &mut Visibility, &mut Anchor), With<NextFruitPreview>>,
     next_fruit: Res<NextFruitType>,
