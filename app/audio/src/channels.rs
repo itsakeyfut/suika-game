@@ -22,6 +22,9 @@ use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use suika_game_core::resources::settings::SettingsResource;
 
+use crate::bgm::{BgmTrack, CurrentBgm};
+use crate::config::{AudioConfig, AudioConfigHandle};
+
 // ---------------------------------------------------------------------------
 // Channel marker types
 // ---------------------------------------------------------------------------
@@ -110,9 +113,26 @@ pub fn apply_volume_settings(
     bgm_channel: Res<AudioChannel<BgmChannel>>,
     sfx_channel: Res<AudioChannel<SfxChannel>>,
     mut prev: ResMut<PreviousVolume>,
+    current_bgm: Res<CurrentBgm>,
+    audio_config_handle: Option<Res<AudioConfigHandle>>,
+    audio_config_assets: Res<Assets<AudioConfig>>,
 ) {
     if settings.bgm_volume != prev.bgm {
-        bgm_channel.set_volume(volume_to_db(settings.bgm_volume));
+        // Combine design dB (track-specific offset from AudioConfig) with the
+        // user's volume preference so that already-playing BGM stays consistent
+        // with the volume used when the track was started.
+        let default_cfg = AudioConfig::default();
+        let cfg = audio_config_handle
+            .as_ref()
+            .and_then(|h| audio_config_assets.get(&h.0))
+            .unwrap_or(&default_cfg);
+        let design_db = match current_bgm.track {
+            BgmTrack::Title => cfg.bgm_title_volume,
+            BgmTrack::Game => cfg.bgm_game_volume,
+            BgmTrack::GameOver => cfg.bgm_gameover_volume,
+            BgmTrack::None => 0.0,
+        };
+        bgm_channel.set_volume(design_db + volume_to_db(settings.bgm_volume));
         prev.bgm = settings.bgm_volume;
     }
     if settings.sfx_volume != prev.sfx {

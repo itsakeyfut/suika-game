@@ -22,8 +22,9 @@ use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use std::time::Duration;
 use suika_game_core::prelude::AppState;
+use suika_game_core::resources::settings::SettingsResource;
 
-use crate::channels::BgmChannel;
+use crate::channels::{BgmChannel, volume_to_db};
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::BgmHandles;
 
@@ -108,6 +109,7 @@ pub fn switch_bgm_on_state_change(
     bgm_handles: Option<Res<BgmHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
+    settings: Res<SettingsResource>,
 ) {
     let Some(bgm_handles) = bgm_handles else {
         return;
@@ -134,8 +136,10 @@ pub fn switch_bgm_on_state_change(
             cfg.bgm_fade_out_secs,
         )));
 
-    // Start the new track.  Per-sound volumes are design levels from AudioConfig;
-    // the overall user volume is applied separately via AudioChannel::set_volume.
+    // Start the new track.  Combine the designer's dB offset (from AudioConfig)
+    // with the user's channel volume (from SettingsResource) so that the saved
+    // volume preference is always applied — even on the very first BGM start.
+    let user_bgm_db = volume_to_db(settings.bgm_volume);
     match desired {
         BgmTrack::None => {
             // Already stopped above; nothing more to do.
@@ -144,7 +148,7 @@ pub fn switch_bgm_on_state_change(
             bgm_channel
                 .play(bgm_handles.title.clone())
                 .looped()
-                .with_volume(cfg.bgm_title_volume)
+                .with_volume(cfg.bgm_title_volume + user_bgm_db)
                 .fade_in(AudioTween::linear(Duration::from_secs_f32(
                     cfg.bgm_title_fade_in_secs,
                 )));
@@ -153,7 +157,7 @@ pub fn switch_bgm_on_state_change(
             bgm_channel
                 .play(bgm_handles.game.clone())
                 .looped()
-                .with_volume(cfg.bgm_game_volume)
+                .with_volume(cfg.bgm_game_volume + user_bgm_db)
                 .fade_in(AudioTween::linear(Duration::from_secs_f32(
                     cfg.bgm_game_fade_in_secs,
                 )));
@@ -162,7 +166,7 @@ pub fn switch_bgm_on_state_change(
             // One-shot: no loop, no fade-in.
             bgm_channel
                 .play(bgm_handles.gameover.clone())
-                .with_volume(cfg.bgm_gameover_volume);
+                .with_volume(cfg.bgm_gameover_volume + user_bgm_db);
         }
     }
 

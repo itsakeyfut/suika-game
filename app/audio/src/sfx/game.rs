@@ -3,9 +3,10 @@
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
 use suika_game_core::events::{FruitMergeEvent, ScoreEarnedEvent};
+use suika_game_core::resources::settings::SettingsResource;
 
 use super::MergeSfxCategory;
-use crate::channels::SfxChannel;
+use crate::channels::{SfxChannel, volume_to_db};
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::SfxHandles;
 
@@ -25,6 +26,7 @@ pub fn play_merge_sfx(
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
+    settings: Res<SettingsResource>,
 ) {
     let Some(sfx_handles) = sfx_handles else {
         return;
@@ -37,31 +39,32 @@ pub fn play_merge_sfx(
         .and_then(|h| audio_config_assets.get(&h.0))
         .unwrap_or(&default_cfg);
 
+    let user_sfx_db = volume_to_db(settings.sfx_volume);
     for event in merge_events.read() {
         match MergeSfxCategory::from_fruit(event.fruit_type) {
             MergeSfxCategory::Small => {
                 sfx_channel
                     .play(sfx_handles.merge_small.clone())
-                    .with_volume(cfg.sfx_merge_small_volume)
+                    .with_volume(cfg.sfx_merge_small_volume + user_sfx_db)
                     .with_playback_rate(cfg.sfx_merge_small_pitch);
             }
             MergeSfxCategory::Medium => {
                 sfx_channel
                     .play(sfx_handles.merge_medium.clone())
-                    .with_volume(cfg.sfx_merge_medium_volume)
+                    .with_volume(cfg.sfx_merge_medium_volume + user_sfx_db)
                     .with_playback_rate(cfg.sfx_merge_medium_pitch);
             }
             MergeSfxCategory::Large => {
                 sfx_channel
                     .play(sfx_handles.merge_large.clone())
-                    .with_volume(cfg.sfx_merge_large_volume)
+                    .with_volume(cfg.sfx_merge_large_volume + user_sfx_db)
                     .with_playback_rate(cfg.sfx_merge_large_pitch);
             }
             MergeSfxCategory::Watermelon => {
                 // Special fanfare — no pitch shift, played at full original pitch.
                 sfx_channel
                     .play(sfx_handles.watermelon.clone())
-                    .with_volume(cfg.sfx_watermelon_volume);
+                    .with_volume(cfg.sfx_watermelon_volume + user_sfx_db);
                 info!("Watermelon! Playing fanfare SFX");
             }
         }
@@ -85,6 +88,7 @@ pub fn play_combo_sfx(
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
+    settings: Res<SettingsResource>,
 ) {
     let Some(sfx_handles) = sfx_handles else {
         return;
@@ -96,6 +100,7 @@ pub fn play_combo_sfx(
         .and_then(|h| audio_config_assets.get(&h.0))
         .unwrap_or(&default_cfg);
 
+    let user_sfx_db = volume_to_db(settings.sfx_volume);
     for event in score_events.read() {
         // Only play the combo sound when a real combo is in progress.
         if event.combo_count < 2 {
@@ -109,7 +114,7 @@ pub fn play_combo_sfx(
 
         sfx_channel
             .play(sfx_handles.combo.clone())
-            .with_volume(cfg.sfx_combo_volume)
+            .with_volume(cfg.sfx_combo_volume + user_sfx_db)
             .with_playback_rate(pitch);
     }
 }
@@ -124,6 +129,7 @@ pub fn play_gameover_sfx(
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
+    settings: Res<SettingsResource>,
 ) {
     let Some(sfx_handles) = sfx_handles else {
         return;
@@ -137,7 +143,7 @@ pub fn play_gameover_sfx(
 
     sfx_channel
         .play(sfx_handles.gameover.clone())
-        .with_volume(cfg.sfx_gameover_volume);
+        .with_volume(cfg.sfx_gameover_volume + volume_to_db(settings.sfx_volume));
 
     info!("Game-over SFX playing");
 }

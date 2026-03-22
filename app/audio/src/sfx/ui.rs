@@ -2,9 +2,10 @@
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
+use suika_game_core::resources::settings::SettingsResource;
 use suika_game_ui::components::{KeyboardFocusIndex, MenuButton};
 
-use crate::channels::SfxChannel;
+use crate::channels::{SfxChannel, volume_to_db};
 use crate::config::{AudioConfig, AudioConfigHandle};
 use crate::handles::SfxHandles;
 
@@ -21,6 +22,7 @@ pub fn play_ui_sfx(
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
+    settings: Res<SettingsResource>,
 ) {
     let Some(sfx_handles) = sfx_handles else {
         return;
@@ -32,17 +34,18 @@ pub fn play_ui_sfx(
         .and_then(|h| audio_config_assets.get(&h.0))
         .unwrap_or(&default_cfg);
 
+    let user_sfx_db = volume_to_db(settings.sfx_volume);
     for interaction in interaction_query.iter() {
         match *interaction {
             Interaction::Pressed => {
                 sfx_channel
                     .play(sfx_handles.button_click.clone())
-                    .with_volume(cfg.sfx_button_click_volume);
+                    .with_volume(cfg.sfx_button_click_volume + user_sfx_db);
             }
             Interaction::Hovered => {
                 sfx_channel
                     .play(sfx_handles.button_hover.clone())
-                    .with_volume(cfg.sfx_button_hover_volume);
+                    .with_volume(cfg.sfx_button_hover_volume + user_sfx_db);
             }
             Interaction::None => {}
         }
@@ -68,6 +71,7 @@ pub fn play_keyboard_ui_sfx(
     sfx_handles: Option<Res<SfxHandles>>,
     audio_config_handle: Option<Res<AudioConfigHandle>>,
     audio_config_assets: Res<Assets<AudioConfig>>,
+    settings: Res<SettingsResource>,
 ) {
     // No menu buttons on screen — reset tracking and bail.
     if button_query.is_empty() {
@@ -88,19 +92,21 @@ pub fn play_keyboard_ui_sfx(
         .and_then(|h| audio_config_assets.get(&h.0))
         .unwrap_or(&default_cfg);
 
+    let user_sfx_db = volume_to_db(settings.sfx_volume);
+
     // Hover sound: only when the focus index actually moved.
     let old = prev_focus.replace(current);
     if old.is_some_and(|p| p != current) {
         sfx_channel
             .play(sfx_handles.button_hover.clone())
-            .with_volume(cfg.sfx_button_hover_volume);
+            .with_volume(cfg.sfx_button_hover_volume + user_sfx_db);
     }
 
     // Confirm key → click sound.
     if keyboard.just_pressed(KeyCode::Enter) {
         sfx_channel
             .play(sfx_handles.button_click.clone())
-            .with_volume(cfg.sfx_button_click_volume);
+            .with_volume(cfg.sfx_button_click_volume + user_sfx_db);
     }
 }
 
