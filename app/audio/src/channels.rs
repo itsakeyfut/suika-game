@@ -1,22 +1,31 @@
 //! Typed audio channels for BGM and SFX.
 //!
-//! Using two separate [`AudioChannel`] buses means the user's volume slider
-//! controls **all** sounds on that bus at once, independently of the
-//! per-sound design volumes set in `assets/config/audio.ron`.
+//! Using two separate [`AudioChannel`] buses lets BGM and SFX be controlled
+//! independently.  Because `bevy_kira_audio`'s `.with_volume(design_dB)`
+//! overrides the channel-level volume for **new** sounds, user preference and
+//! design offset are combined at the call site rather than applied separately.
 //!
-//! # Architecture
+//! # Effective-volume model
 //!
 //! ```text
-//! AudioChannel<BgmChannel>  ← set_volume(user_bgm_dB)
-//!   └─ bgm_handles.title / game / gameover   ← with_volume(design_dB)
-//!
-//! AudioChannel<SfxChannel>  ← set_volume(user_sfx_dB)
-//!   └─ sfx_handles.*                         ← with_volume(design_dB)
+//! effective_dB = design_dB (AudioConfig)  +  user_dB (SettingsResource)
 //! ```
 //!
-//! When the user sets volume to 0 the channel is driven to −100 dB, which
-//! bevy_kira_audio / kira rounds to silence, guaranteeing no audio leaks
-//! through regardless of the per-sound design levels.
+//! This combined value is passed to `.with_volume(effective_dB)` each time a
+//! sound is started, and to `AudioChannel::set_volume(effective_dB)` when the
+//! user adjusts the slider (so already-playing BGM updates immediately).
+//!
+//! ```text
+//! AudioChannel<BgmChannel>
+//!   └─ bgm_handles.*  ← .with_volume(design_dB + user_bgm_dB)   at track start
+//!                     ← set_volume(design_dB + user_bgm_dB)      on settings change
+//!
+//! AudioChannel<SfxChannel>
+//!   └─ sfx_handles.*  ← .with_volume(design_dB + user_sfx_dB)   at each SFX play
+//! ```
+//!
+//! When the user sets volume to 0 the user_dB term is −100 dB, which
+//! bevy_kira_audio / kira rounds to silence regardless of the design offset.
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
